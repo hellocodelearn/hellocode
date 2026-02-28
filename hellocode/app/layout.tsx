@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "你好码",
   description: "最佳代码学习伴侣",
+  icons: {
+    icon: "/robot-mascot.svg",
+  },
 };
 
 export default function RootLayout({
