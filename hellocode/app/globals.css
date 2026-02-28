@@ -75,3 +75,21 @@ body {
   animation: diamond-fly-to-corner 1s ease-in forwards;
   pointer-events: none;
 }
+
+/* 首页当前学习关卡的圆弧扩散收缩动效 */
+@keyframes arc-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.9;
+  }
+}
+
+.animate-arc-pulse {
+  animation: arc-pulse 1.4s ease-in-out infinite;
+  transform-origin: center center;
+}

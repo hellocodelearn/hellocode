@@ -50,11 +50,14 @@ function CheckpointNode({
   onShowOutOfEnergy?: () => void;
   onSelectLesson?: (lessonId: string, event: React.MouseEvent) => void;
 }) {
-  const { plays, isUnlocked } = computeLessonState(progress, lessonId);
+  const { plays, isUnlocked, isCleared } = computeLessonState(progress, lessonId);
   const isTrophy = indexInPart === part.lessonIds.length - 1;
   const baseColor = part.color;
   const grayBg = "#e5e5e5";
   const grayBorder = "#cfcfcf";
+
+  // 仅“当前在学”的关卡（已解锁且未通关）展示 5 段圆弧；已学过的不展示圆弧
+  const isCurrentLesson = isUnlocked && !isCleared;
 
   // 0~1 之间的进度（每关玩 PLAYS_TO_CLEAR 次，默认 5 次）
   const ratio = Math.min(1, plays / PLAYS_TO_CLEAR);
@@ -65,10 +68,10 @@ function CheckpointNode({
   const discLight = isUnlocked ? baseColor : grayBg;
   const discDark = isUnlocked ? "#46a302" : grayBorder;
 
-  // 5 段圆弧：上上版的间隔和厚度（弧长约 43°，厚 6px，半径 38），用 SVG 画成真圆弧
+  // 5 段圆弧：仅当前在学关卡渲染，带扩散收缩动效
   const arcRadius = 38;
   const arcStrokeWidth = 6;
-  const segDeg = 43; // 每段弧的角度（72° 一等分，剩余为间隙，对应上上版约 28px 弧长）
+  const segDeg = 43;
   const cx = 48;
   const cy = 48;
 
@@ -79,7 +82,7 @@ function CheckpointNode({
     const y1 = cy + arcRadius * Math.sin(startAngle);
     const x2 = cx + arcRadius * Math.cos(endAngle);
     const y2 = cy + arcRadius * Math.sin(endAngle);
-    const fill = isUnlocked && i < filledSegments ? baseColor : grayBg;
+    const fill = i < filledSegments ? baseColor : grayBg;
     return { d: `M ${x1} ${y1} A ${arcRadius} ${arcRadius} 0 0 1 ${x2} ${y2}`, fill };
   });
 
@@ -105,24 +108,31 @@ function CheckpointNode({
       }}
     >
       <div className="relative flex items-center justify-center" style={{ width: 96, height: 96 }}>
-        {/* 5 段圆弧：SVG 真弧，间隔和厚度与上上版一致 */}
-        <svg
-          viewBox="0 0 96 96"
-          className="absolute"
-          style={{ width: 96, height: 96 }}
-          aria-hidden
-        >
-          {arcPaths.map(({ d, fill }, i) => (
-            <path
-              key={i}
-              d={d}
-              fill="none"
-              stroke={fill}
-              strokeWidth={arcStrokeWidth}
-              strokeLinecap="round"
-            />
-          ))}
-        </svg>
+        {/* 5 段圆弧：仅当前在学关卡显示，带扩散收缩动效 */}
+        {isCurrentLesson && (
+          <div
+            className="absolute inset-0 flex items-center justify-center animate-arc-pulse"
+            style={{ width: 96, height: 96 }}
+            aria-hidden
+          >
+            <svg
+              viewBox="0 0 96 96"
+              className="absolute"
+              style={{ width: 96, height: 96 }}
+            >
+              {arcPaths.map(({ d, fill }, i) => (
+                <path
+                  key={i}
+                  d={d}
+                  fill="none"
+                  stroke={fill}
+                  strokeWidth={arcStrokeWidth}
+                  strokeLinecap="round"
+                />
+              ))}
+            </svg>
+          </div>
+        )}
         {/* 中间实心圆盘 */}
         <div
           className="relative rounded-full flex items-center justify-center"
@@ -184,7 +194,7 @@ export default function Page() {
           <div className="flex items-center gap-3 text-[13px] font-semibold">
             <div className="flex items-center gap-1">
               <span className="text-[18px] rounded-md bg-white/70 px-1 shadow-sm">
-                🇪🇸
+                C语言
               </span>
               <span>1</span>
             </div>
