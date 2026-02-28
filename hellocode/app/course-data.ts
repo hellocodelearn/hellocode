@@ -85,8 +85,8 @@ export const questions: Record<string, Question> = {
   "q_quote_string": {
     id: "q_quote_string", type: "sort", title: "字符串两边要加什么符号？",
     codeTemplate: [{ type: "text", value: "printf(" }, { type: "blank", id: "s1" }, { type: "text", value: "Hello" }, { type: "blank", id: "s2" }, { type: "text", value: ");" }],
-    options: [{ id: "o1", label: '"' }, { id: "o2", label: "'" }, { id: "o3", label: "`" }],
-    correctByBlank: { "s1": "o1", "s2": "o1" }
+    options: [{ id: "o1", label: '"' }, { id: "o2", label: "'" }, { id: "o3", label: "`" },{ id: "o4", label: '"' }, { id: "o5", label: "'" }, { id: "o6", label: "`" }],
+    correctByBlank: { "s1": "o1", "s2": "o4" }
   },
   // 第4关 输出数字
   "q_print_number": {

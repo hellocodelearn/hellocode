@@ -47,6 +47,14 @@ export interface UserProgress {
   diamonds?: number;
   /** 总经验（点击“领取经验”后才会累加） */
   xp?: number;
+  /** 连胜：有完成学习的日期列表（YYYY-MM-DD，与 getRefillDay 一致），最多保留 30 天 */
+  completedDays?: string[];
+  /** 连胜：上次完成学习的日期（当天完成即算连胜一天） */
+  lastCompletedDay?: string;
+  /** 连胜：当前连续天数 */
+  streakDays?: number;
+  /** 连胜弹窗：上次展示的日期，用于一天只弹一次 */
+  lastStreakPopupDay?: string;
 }
 
 export function createInitialProgress(): UserProgress {
@@ -200,6 +208,74 @@ export function recordWrongQuestion(
   });
 
   progress.wrongQuestions = list;
+  saveProgress(progress);
+}
+
+const MAX_COMPLETED_DAYS = 30;
+
+/** 获取“昨天”的 refill 日（用于连胜计算） */
+function getYesterdayRefillDay(): string {
+  return getRefillDay(new Date(Date.now() - 86400 * 1000));
+}
+
+/** 记录今日完成一个单元（点击领取经验时调用）。每天只计一次，连续完成则连胜+1 */
+export function recordLessonCompletion(): void {
+  const progress = loadProgress();
+  const today = getRefillDay(new Date());
+  const yesterday = getYesterdayRefillDay();
+  let completedDays = progress.completedDays ?? [];
+  if (!completedDays.includes(today)) {
+    completedDays = [...completedDays, today].slice(-MAX_COMPLETED_DAYS);
+    progress.completedDays = completedDays;
+  }
+  if (progress.lastCompletedDay === today) return;
+  if (progress.lastCompletedDay === yesterday) {
+    progress.streakDays = (progress.streakDays ?? 0) + 1;
+  } else {
+    progress.streakDays = 1;
+  }
+  progress.lastCompletedDay = today;
+  saveProgress(progress);
+}
+
+/** 当前连胜天数（与主页展示一致） */
+export function getStreakDays(progress: UserProgress): number {
+  const v = progress.streakDays;
+  if (v == null || typeof v !== "number") return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** 当前周一到周日对应的 refill 日字符串 */
+function getCurrentWeekRefillDays(): string[] {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + mondayOffset);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return getRefillDay(d);
+  });
+}
+
+/** 本周一～周日是否各有完成（用于连胜战绩日历） */
+export function getCompletedDaysForWeek(progress: UserProgress): boolean[] {
+  const weekDays = getCurrentWeekRefillDays();
+  const set = new Set(progress.completedDays ?? []);
+  return weekDays.map((day) => set.has(day));
+}
+
+/** 今天是否还没展示过连胜弹窗（一天只弹一次） */
+export function shouldShowStreakPopupToday(progress: UserProgress): boolean {
+  const today = getRefillDay(new Date());
+  return progress.lastStreakPopupDay !== today;
+}
+
+/** 标记今日已展示连胜弹窗 */
+export function markStreakPopupShown(): void {
+  const progress = loadProgress();
+  progress.lastStreakPopupDay = getRefillDay(new Date());
   saveProgress(progress);
 }
 

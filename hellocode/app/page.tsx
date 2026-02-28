@@ -13,6 +13,7 @@ import {
   getEnergy,
   getLessonPlays,
   loadProgress,
+  getStreakDays,
   ENERGY_COST_PER_QUESTION,
   MAX_ENERGY,
   spendDiamondsForEnergyRefill,
@@ -192,7 +193,7 @@ export default function Page() {
               <span className="material-symbols-outlined text-[18px] leading-none">
                 local_fire_department
               </span>
-              <span>1</span>
+              <span>{getStreakDays(progress)}</span>
             </div>
 
             <div className="flex items-center gap-1 text-[#1cb0f6]">

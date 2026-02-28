@@ -13,9 +13,14 @@ import {
   incrementLessonPlays,
   loadProgress,
   MAX_ENERGY,
+  recordLessonCompletion,
   recordWrongQuestion,
   spendDiamondsForEnergyRefill,
   DIAMONDS_FOR_ENERGY_REFILL,
+  getStreakDays,
+  getCompletedDaysForWeek,
+  shouldShowStreakPopupToday,
+  markStreakPopupShown,
 } from "@/app/user-progress";
 
 type CheckState = "idle" | "correct" | "wrong";
@@ -244,6 +249,7 @@ export default function LessonPage() {
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
   const [showSubscriptionOffer, setShowSubscriptionOffer] = useState(false);
   const [showDiamondClaim, setShowDiamondClaim] = useState(false);
+  const [showStreakPopup, setShowStreakPopup] = useState(false);
   const [diamondDisplayCount, setDiamondDisplayCount] = useState(0);
   const diamondClaimInitialRef = useRef<number>(0);
   const searchParams = useSearchParams();
@@ -582,6 +588,7 @@ export default function LessonPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    recordLessonCompletion();
                     addXP(computedXP);
                     setShowResultScreen(false);
                     setShowSubscriptionOffer(true);
@@ -1144,6 +1151,66 @@ export default function LessonPage() {
           </div>
         )}
 
+        {/* 连胜战绩弹窗：领取钻石后、一天只弹一次 */}
+        {showStreakPopup && (() => {
+          const p = loadProgress();
+          const streak = getStreakDays(p);
+          const weekCompleted = getCompletedDaysForWeek(p);
+          const percent = Math.max(10, Math.min(95, 100 - streak * 3));
+          const weekLabels = ["一", "二", "三", "四", "五", "六", "日"];
+          return (
+            <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-white dark:bg-[#101922] px-6">
+              <div className="flex flex-col items-center flex-1 justify-center w-full max-w-sm">
+                <span className="material-symbols-outlined text-6xl text-[#FF9800]" aria-hidden>
+                  local_fire_department
+                </span>
+                <div className="text-5xl font-extrabold text-[#FF9800] mt-2 tabular-nums">{streak}</div>
+                <p className="text-base text-slate-700 dark:text-slate-300 mt-1">连胜战绩</p>
+                <div className="mt-8 w-full flex flex-col items-center">
+                  <div className="flex justify-between w-full max-w-[280px] mb-2">
+                    {weekLabels.map((label) => (
+                      <span key={label} className="text-xs text-slate-600 dark:text-slate-400 w-8 text-center">
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex justify-between w-full max-w-[280px] gap-1">
+                    {weekCompleted.map((done, i) => (
+                      <div
+                        key={i}
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-white text-lg flex-shrink-0"
+                        style={{
+                          backgroundColor: done ? (i % 2 === 0 ? "#5AC8FA" : "#FF9800") : "#e5e5e5",
+                        }}
+                      >
+                        {done ? "✓" : "😎"}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 text-center mt-6 px-2">
+                  你成为了今天前
+                  <span className="font-bold text-[#FF9800] mx-0.5">{percent}%</span>
+                  最先延续连胜的优秀人士之一!
+                </p>
+              </div>
+              <div className="w-full max-w-sm pb-10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    markStreakPopupShown();
+                    setShowStreakPopup(false);
+                    router.push("/");
+                  }}
+                  className="w-full py-3.5 rounded-2xl bg-[#007AFF] hover:bg-[#0066d6] text-white font-bold text-base"
+                >
+                  我坚持，不放弃
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 钻石领取界面：右上角钻石系统，钻石飞入后数字+15 */}
         {showDiamondClaim && (
           <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-white dark:bg-[#101922] px-6">
@@ -1193,7 +1260,12 @@ export default function LessonPage() {
                 onClick={() => {
                   addDiamonds(DIAMONDS_REWARD);
                   setShowDiamondClaim(false);
-                  router.push("/");
+                  const p = loadProgress();
+                  if (shouldShowStreakPopupToday(p)) {
+                    setShowStreakPopup(true);
+                  } else {
+                    router.push("/");
+                  }
                 }}
                 className="w-full py-3.5 rounded-2xl bg-[#1cb0f6] hover:bg-[#1990d8] text-white font-bold text-base"
               >
