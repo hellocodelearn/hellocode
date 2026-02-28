@@ -18,7 +18,7 @@ import {
   spendDiamondsForEnergyRefill,
   DIAMONDS_FOR_ENERGY_REFILL,
 } from "@/app/user-progress";
-
+//
 function computeLessonState(
   progress: UserProgress,
   lessonId: string
