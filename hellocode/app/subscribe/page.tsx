@@ -4,6 +4,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import {
+  IconCheckCircle,
+  IconBattery,
+  IconInfinity,
+  IconPhoneOff,
+  IconHeadphones,
+  IconKey,
+  IconHome,
+} from "@/app/components/icons";
 
 export default function SubscribePage() {
   const pathname = usePathname();
@@ -35,49 +44,24 @@ export default function SubscribePage() {
             </h2>
             <ul className="mt-3 space-y-2">
               <li className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <span className="material-symbols-outlined text-[#0ea5e9] text-[18px]">
-                  check_circle
-                </span>
+                <IconCheckCircle className="w-[18px] h-[18px] text-[#0ea5e9]" />
                 无限能量
               </li>
               <li className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <span className="material-symbols-outlined text-[#0ea5e9] text-[18px]">
-                  check_circle
-                </span>
+                <IconCheckCircle className="w-[18px] h-[18px] text-[#0ea5e9]" />
                 免广告
               </li>
             </ul>
-            {/* 右侧图标：电池图标（Material Symbols）+ 无限符号 */}
+            {/* 右侧图标：电池 + 无限符号（Lucide 统一风格） */}
             <div
               className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center justify-center"
               aria-hidden
             >
               <div className="relative w-12 h-14 flex items-center justify-center">
-                <span
-                  className="material-symbols-outlined absolute text-[48px] leading-none"
-                  style={{
-                    color: "transparent",
-                    background: "linear-gradient(135deg, #7c3aed 0%, #0ea5e9 50%, #58cc02 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }}
-                  aria-hidden
-                >
-                  battery_full
-                </span>
-                <span
-                  className="material-symbols-outlined relative text-xl font-bold"
-                  style={{
-                    background: "linear-gradient(135deg, #7c3aed 0%, #0ea5e9 50%, #58cc02 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }}
-                  aria-hidden
-                >
-                  infinity
-                </span>
+                <IconBattery className="absolute w-10 h-12 text-[#0ea5e9]/80" />
+                <IconInfinity
+                  className="relative w-6 h-6 font-bold text-[#7c3aed]"
+                />
               </div>
             </div>
           </div>
@@ -140,7 +124,7 @@ export default function SubscribePage() {
                       background: "linear-gradient(135deg, #3b82f6 0%, #7c3aed 100%)",
                     }}
                   >
-                    <span className="material-symbols-outlined text-white text-xl">infinity</span>
+                    <IconInfinity className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-slate-800 dark:text-slate-100 font-medium">无限能量</span>
                 </li>
@@ -151,7 +135,7 @@ export default function SubscribePage() {
                       background: "linear-gradient(135deg, #a78bfa 0%, #86efac 100%)",
                     }}
                   >
-                    <span className="material-symbols-outlined text-white text-xl">do_not_disturb</span>
+                    <IconPhoneOff className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-slate-800 dark:text-slate-100 font-medium">免广告全无打扰</span>
                 </li>
@@ -162,7 +146,7 @@ export default function SubscribePage() {
                       background: "linear-gradient(135deg, #0ea5e9 0%, #a78bfa 50%, #ec4899 100%)",
                     }}
                   >
-                    <span className="material-symbols-outlined text-white text-xl">headphones</span>
+                    <IconHeadphones className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-slate-800 dark:text-slate-100 font-medium">编程练习不限次</span>
                 </li>
@@ -173,7 +157,7 @@ export default function SubscribePage() {
                       background: "linear-gradient(135deg, #10b981 0%, #3b82f6 50%, #ec4899 100%)",
                     }}
                   >
-                    <span className="material-symbols-outlined text-white text-xl">key</span>
+                    <IconKey className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-slate-800 dark:text-slate-100 font-medium">免费参加限时挑战</span>
                 </li>
@@ -237,7 +221,7 @@ export default function SubscribePage() {
                 : "hover:text-gray-800 dark:hover:text-gray-200"
             }`}
           >
-            <span className="material-symbols-outlined text-[26px]">home</span>
+            <IconHome className="w-[26px] h-[26px]" />
             <span className="text-xs font-medium">主页</span>
           </Link>
 

@@ -23,6 +23,16 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 隐藏滚动条（用于首页等需要干净 UI 的滚动区域） */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
 }
 
 @keyframes slide-up {
@@ -92,4 +102,44 @@ body {
 .animate-arc-pulse {
   animation: arc-pulse 1.4s ease-in-out infinite;
   transform-origin: center center;
+}
+
+/* 宝箱领取成功动效：图标先放大再回弹 */
+@keyframes chest-claim {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-chest-claim {
+  animation: chest-claim 0.5s ease-out forwards;
+}
+
+/* 领取后 "+N 钻石" 文字从下方淡入上浮 */
+@keyframes chest-toast {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.animate-chest-toast {
+  animation: chest-toast 0.4s ease-out forwards;
 }

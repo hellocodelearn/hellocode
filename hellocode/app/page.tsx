@@ -6,6 +6,22 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStage1LessonById, parts, Part } from "@/app/course-data";
 import {
+  IconStar,
+  IconTrophy,
+  IconFlame,
+  IconGem,
+  IconBattery,
+  IconZap,
+  IconFileText,
+  IconCheckCircle,
+  IconHome,
+} from "@/app/components/icons";
+import {
+  TreasureChestReadyIcon,
+  TreasureChestClaimedIcon,
+} from "@/app/components/treasure-chest-icon";
+import { ThreeStarChallengeEntry } from "@/app/components/three-star-challenge-entry";
+import {
   PLAYS_TO_CLEAR,
   UserProgress,
   createInitialProgress,
@@ -14,10 +30,15 @@ import {
   getLessonPlays,
   loadProgress,
   getStreakDays,
+  hasPlayedToday,
+  hasClaimedPartChest,
+  claimPartChest,
   ENERGY_COST_PER_QUESTION,
+  CHALLENGE_ENERGY_COST,
   MAX_ENERGY,
   spendDiamondsForEnergyRefill,
   DIAMONDS_FOR_ENERGY_REFILL,
+  getChallengeStarsForPart,
 } from "@/app/user-progress";
 //
 function computeLessonState(
@@ -75,13 +96,14 @@ function CheckpointNode({
   const cx = 48;
   const cy = 48;
 
+  // 圆弧路径：坐标取整到 2 位小数，避免服务端/客户端浮点差异导致 hydration 报错
   const arcPaths = Array.from({ length: segments }).map((_, i) => {
     const startAngle = ((-90 + i * 72) * Math.PI) / 180;
     const endAngle = ((-90 + i * 72 + segDeg) * Math.PI) / 180;
-    const x1 = cx + arcRadius * Math.cos(startAngle);
-    const y1 = cy + arcRadius * Math.sin(startAngle);
-    const x2 = cx + arcRadius * Math.cos(endAngle);
-    const y2 = cy + arcRadius * Math.sin(endAngle);
+    const x1 = Number((cx + arcRadius * Math.cos(startAngle)).toFixed(2));
+    const y1 = Number((cy + arcRadius * Math.sin(startAngle)).toFixed(2));
+    const x2 = Number((cx + arcRadius * Math.cos(endAngle)).toFixed(2));
+    const y2 = Number((cy + arcRadius * Math.sin(endAngle)).toFixed(2));
     const fill = i < filledSegments ? baseColor : grayBg;
     return { d: `M ${x1} ${y1} A ${arcRadius} ${arcRadius} 0 0 1 ${x2} ${y2}`, fill };
   });
@@ -119,6 +141,7 @@ function CheckpointNode({
               viewBox="0 0 96 96"
               className="absolute"
               style={{ width: 96, height: 96 }}
+              suppressHydrationWarning
             >
               {arcPaths.map(({ d, fill }, i) => (
                 <path
@@ -150,13 +173,102 @@ function CheckpointNode({
             className="absolute -top-1 left-4 w-8 h-3 rounded-full bg-white/35"
             style={{ transform: "rotate(-20deg)" }}
           />
-          <span className="material-symbols-outlined text-[30px]" style={{ color: iconColor }}>
-            {isTrophy ? "emoji_events" : "star"}
-          </span>
+          {isTrophy ? (
+            <IconTrophy className="w-[30px] h-[30px]" style={{ color: iconColor }} />
+          ) : (
+            <IconStar className="w-[30px] h-[30px]" style={{ color: iconColor }} />
+          )}
         </div>
       </div>
     </button>
   );
+}
+
+/** 部分中间的宝箱节点：未解锁=灰白不可点；解锁未领=彩色可点；已领取=彩色+动效 */
+function TreasureChestNode({
+  part,
+  progress,
+  isUnlockable,
+  onClaim,
+}: {
+  part: Part;
+  progress: UserProgress;
+  isUnlockable: boolean;
+  onClaim: () => void;
+}) {
+  const [justClaimed, setJustClaimed] = useState(false);
+  const claimed = hasClaimedPartChest(progress, part.id);
+  const canClick = isUnlockable && !claimed;
+  const isLocked = !isUnlockable;
+
+  // 普通关卡外圈是 96px，这里放大到 1.2 倍
+  const sizePx = 96 * 1.2;
+  const sizeStyle = { width: sizePx, height: sizePx };
+
+  const chestSizeClass = "w-[115px] h-[115px]";
+
+  let ChestIcon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  if (claimed || justClaimed) {
+    ChestIcon = TreasureChestClaimedIcon;
+  } else {
+    ChestIcon = TreasureChestReadyIcon;
+  }
+
+  return (
+    <div className="flex justify-center">
+      <button
+        type="button"
+        disabled={!canClick}
+        aria-label={isLocked ? "完成前面关卡后可领取" : claimed ? "已领取" : "领取钻石"}
+        onClick={() => {
+          if (!canClick) return;
+          if (claimPartChest(part.id)) {
+            setJustClaimed(true);
+            onClaim();
+            setTimeout(() => setJustClaimed(false), 1500);
+          }
+        }}
+        className={`relative inline-flex items-center justify-center transition-transform ${
+          canClick ? "cursor-pointer" : "cursor-default"
+        } bg-transparent border-none shadow-none p-0`}
+        style={sizeStyle}
+      >
+        <ChestIcon
+          className={`${chestSizeClass} transition-transform duration-300 ${
+            isLocked ? "grayscale opacity-60" : ""
+          } ${justClaimed ? "animate-chest-claim" : ""}`}
+        />
+      </button>
+    </div>
+  );
+}
+
+/** 宝箱是否可点击：只有宝箱之前的关卡全部通关后才可领取 */
+function isPartChestUnlockable(progress: UserProgress, part: Part): boolean {
+  const ids = part.lessonIds;
+  const mid = Math.floor(ids.length / 2);
+  return ids
+    .slice(0, mid)
+    .every((lessonId) => getLessonPlays(progress, lessonId) >= PLAYS_TO_CLEAR);
+}
+
+/** 将某部分的关卡列表变为「前半 + 宝箱 + 后半」的路径节点（中间插宝箱） */
+type PathNode =
+  | { type: "lesson"; lessonId: string; indexInPart: number }
+  | { type: "chest"; partId: string };
+
+function getPartPathNodes(part: Part): PathNode[] {
+  const ids = part.lessonIds;
+  const mid = Math.floor(ids.length / 2);
+  const nodes: PathNode[] = [];
+  for (let i = 0; i < mid; i++) {
+    nodes.push({ type: "lesson", lessonId: ids[i], indexInPart: i });
+  }
+  nodes.push({ type: "chest", partId: part.id });
+  for (let i = mid; i < ids.length; i++) {
+    nodes.push({ type: "lesson", lessonId: ids[i], indexInPart: i });
+  }
+  return nodes;
 }
 
 export default function Page() {
@@ -167,7 +279,9 @@ export default function Page() {
   const [energyRefillChoice, setEnergyRefillChoice] = useState<"super" | "diamonds">("super");
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
-  const [popupAnchor, setPopupAnchor] = useState<{ centerX: number; bottom: number } | null>(null);
+  const [popupAnchor, setPopupAnchor] = useState<{ centerX: number; bottom: number } | null>(
+    null
+  );
 
   useEffect(() => {
     if (pathname !== "/") return;
@@ -189,98 +303,162 @@ export default function Page() {
     <div className="h-screen bg-[#f5f7fb] text-[#3c3c3c] dark:bg-[#131f24] dark:text-slate-100 flex flex-col overflow-hidden">
       {/* 顶部状态栏（固定） */}
       <header className="fixed top-0 left-0 right-0 z-20 bg-[#f5f7fb] dark:bg-[#131f24]">
-        <div className="mx-auto max-w-md px-4 pt-3 pb-2 flex items-center justify-between">
-          {/* 进度 / 货币 / 能量（与局内同步） */}
-          <div className="flex items-center gap-3 text-[13px] font-semibold">
-            <div className="flex items-center gap-1">
-              <span className="text-[18px] rounded-md bg-white/70 px-1 shadow-sm">
-                C语言
-              </span>
-              <span>1</span>
-            </div>
+        <div className="mx-auto max-w-md px-4 pt-3 pb-2 flex text-[13px] font-semibold">
+          {/* 语言等级 */}
+          <div className="w-1/4 flex items-center gap-1">
+            <span className="text-[18px] rounded-md bg-white/70 px-1 shadow-sm">
+              C语言
+            </span>
+            <span className="font-extrabold text-xl leading-none">
+              1
+            </span>
+          </div>
 
-            <div className="flex items-center gap-1 text-gray-400">
-              <span className="material-symbols-outlined text-[18px] leading-none">
-                local_fire_department
-              </span>
-              <span>{getStreakDays(progress)}</span>
-            </div>
+          {/* 连胜火焰 */}
+          <div
+            className={`w-1/4 flex items-center gap-1 ${
+              hasPlayedToday(progress) ? "text-[#FF9800]" : "text-gray-400"
+            }`}
+          >
+            <IconFlame className="w-[18px] h-[18px] leading-none" />
+            <span className="font-extrabold text-xl leading-none">
+              {getStreakDays(progress)}
+            </span>
+          </div>
 
-            <div className="flex items-center gap-1 text-[#1cb0f6]">
-              <span className="material-symbols-outlined text-[18px] leading-none">
-                diamond
-              </span>
-              <span>{getDiamonds(progress)}</span>
-            </div>
+          {/* 钻石 */}
+          <div className="w-1/4 flex items-center gap-1 text-[#1cb0f6]">
+            <IconGem className="w-[18px] h-[18px] leading-none text-[#1cb0f6]" />
+            <span className="font-extrabold text-xl leading-none">
+              {getDiamonds(progress)}
+            </span>
+          </div>
 
-            <div className="flex items-center gap-1.5 text-[#ff78ca]">
-              <div className="relative w-8 h-5 bg-[#ff78ca] rounded-[4px] flex items-center justify-center after:content-[''] after:absolute after:-right-[2px] after:w-[2px] after:h-2 after:bg-[#ff78ca] after:rounded-r-sm">
-                <span className="material-symbols-outlined text-white text-[14px] font-bold fill-1">
-                  bolt
-                </span>
-                <div className="absolute top-0.5 left-0.5 w-[60%] h-[3px] bg-white/30 rounded-full" />
-              </div>
-              <span className="font-extrabold text-xl leading-none">
-                {getEnergy(progress)}
-              </span>
-            </div>
+          {/* 能量 */}
+          <div className="w-1/4 flex items-center gap-1 text-[#ff78ca]">
+            <IconBattery className="w-[18px] h-[18px] leading-none text-[#1cb0f6]" />
+            <span className="font-extrabold text-xl leading-none">
+              {getEnergy(progress)}
+            </span>
           </div>
         </div>
       </header>
 
-      {/* 中间可滚动区域 */}
-      <main className="flex-1 overflow-y-auto">
+      {/* 中间可滚动区域（隐藏原生滚动条） */}
+      <main className="flex-1 overflow-y-auto no-scrollbar">
         <div className="mx-auto max-w-md px-4 pt-[80px] pb-[96px]">
-          {parts.map((part) => (
+          {parts.map((part, partIndex) => (
             <section key={part.id} className="mb-8">
-              {/* 部分卡片 */}
+              {/* 部分卡片：第 1 阶段 · 第 X 部分，下方为标题 */}
               <div
                 className="text-white rounded-3xl px-4 py-3 mb-4 flex items-center justify-between shadow-md"
                 style={{ backgroundColor: part.color }}
               >
-                <div className="text-[13px] leading-snug">
-                  <div className="font-extrabold">第 1 阶段 · {part.title}</div>
-                  <div className="mt-1 text-[15px] font-extrabold">
-                    C 语言 · {part.lessonIds[0]} - {part.lessonIds[part.lessonIds.length - 1]} 关
+                <div className="leading-snug min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-white/90">
+                    第 1 阶段 · 第 {partIndex + 1} 部分
+                  </div>
+                  <div className="mt-1 text-[15px] font-extrabold text-white">
+                    {part.title}
                   </div>
                 </div>
-                <button className="ml-4 w-10 h-10 rounded-2xl bg-black/15 flex items-center justify-center shadow-inner">
-                  <span className="material-symbols-outlined text-[22px] text-white">
-                    menu
-                  </span>
+                <button className="ml-4 w-10 h-10 flex-shrink-0 rounded-2xl bg-black/15 flex items-center justify-center shadow-inner">
+                  <IconFileText className="w-[22px] h-[22px] text-white" />
                 </button>
               </div>
 
-              {/* 路线节点（简单纵向排列，左右略微错位） */}
+              {/* 路线节点：前半关卡 + 中间宝箱 + 后半关卡 */}
               <div className="space-y-4">
-                {part.lessonIds.map((lessonId, idx) => (
-                  <div
-                    key={lessonId}
-                    className={`flex justify-center ${
-                      idx % 2 === 0 ? "-translate-x-4" : "translate-x-4"
-                    }`}
-                  >
-                    <CheckpointNode
-                      lessonId={lessonId}
-                      part={part}
-                      indexInPart={idx}
-                      progress={progress}
-                      onShowOutOfEnergy={() => {
-                        setEnergyRefillChoice("super");
-                        setShowOutOfEnergyModal(true);
-                      }}
-                      onSelectLesson={(id, ev) => {
-                        const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
-                        setPopupAnchor({
-                          centerX: rect.left + rect.width / 2,
-                          bottom: rect.bottom,
-                        });
-                        setSelectedLessonId(id);
-                        setSelectedPartId(part.id);
-                      }}
-                    />
-                  </div>
-                ))}
+                {getPartPathNodes(part).map((node, idx) => {
+                  const rowOffsetClass = idx % 2 === 0 ? "-translate-x-10" : "translate-x-10";
+                  const isLeftRow = idx % 2 === 0;
+                  if (node.type === "lesson") {
+                    return (
+                      <div
+                        key={node.lessonId}
+                        className={`flex justify-center ${rowOffsetClass}`}
+                      >
+                        <CheckpointNode
+                          lessonId={node.lessonId}
+                          part={part}
+                          indexInPart={node.indexInPart}
+                          progress={progress}
+                          onShowOutOfEnergy={() => {
+                            setEnergyRefillChoice("super");
+                            setShowOutOfEnergyModal(true);
+                          }}
+                          onSelectLesson={(id, ev) => {
+                            const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
+                            setPopupAnchor({
+                              centerX: rect.left + rect.width / 2,
+                              bottom: rect.bottom,
+                            });
+                            setSelectedLessonId(id);
+                            setSelectedPartId(part.id);
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+
+                  // 宝箱行：确保宝箱落在蛇形路径的延长线上，挑战关卡在另一侧对称位置
+                  const challengeStars = getChallengeStarsForPart(progress, part.id);
+                  const isChallengeMaxed = challengeStars >= 3;
+                  return (
+                    <div
+                      key={`chest-${node.partId}`}
+                      className="relative h-32 w-full flex items-center justify-center"
+                    >
+                      {/* 容器限制宽度，方便做左右对称 */}
+                      <div className="relative w-full max-w-[280px] h-full">
+                        {/* 宝箱：根据当前行的奇偶决定位置（与蛇形方向对称） */}
+                        <div
+                          className={`absolute top-1/2 -translate-y-1/2 transition-all duration-500 ${
+                            isLeftRow ? "right-0 translate-x-8" : "left-0 -translate-x-8"
+                          }`}
+                        >
+                          <TreasureChestNode
+                            part={part}
+                            progress={progress}
+                            isUnlockable={isPartChestUnlockable(progress, part)}
+                            onClaim={() => setTimeout(() => setProgress(loadProgress()), 0)}
+                          />
+                          {/* 宝箱下方的文字标签（可选） */}
+                          {/* <div className="text-center text-[11px] font-bold text-slate-400 mt-[-10px]">
+                            阶段奖赏
+                          </div> */}
+                        </div>
+
+                        {/* 三星挑战：永远在宝箱的对面 */}
+                        <div
+                          className={`absolute top-1/2 -translate-y-1/2 transition-all duration-500 ${
+                            isLeftRow ? "left-0 -translate-x-8" : "right-0 translate-x-8"
+                          }`}
+                        >
+                          <ThreeStarChallengeEntry
+                            partId={part.id}
+                            animationIndex={partIndex + 1}
+                            stars={challengeStars}
+                            disabled={isChallengeMaxed}
+                            onClick={() => {
+                              const latest = loadProgress();
+                              const energy = getEnergy(latest);
+                              if (energy < CHALLENGE_ENERGY_COST) {
+                                setEnergyRefillChoice("super");
+                                setShowOutOfEnergyModal(true);
+                                return;
+                              }
+                              router.push(`/challenge/${part.id}`);
+                            }}
+                          />
+                          {/* <div className="text-center text-[11px] font-bold text-amber-500 mt-[-2px]">
+                            限时挑战
+                          </div> */}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           ))}
@@ -379,9 +557,7 @@ export default function Page() {
                   能量用完了！
                 </h2>
                 <div className="flex items-center gap-1 text-[#1cb0f6]">
-                  <span className="material-symbols-outlined text-[20px]">
-                    diamond
-                  </span>
+                  <IconGem className="w-5 h-5 text-[#1cb0f6]" />
                   <span className="font-bold text-lg">
                     {getDiamonds(loadProgress())}
                   </span>
@@ -400,14 +576,10 @@ export default function Page() {
                 >
                   <div className="flex items-center justify-center gap-1 mb-1">
                     <span className="text-xs font-bold">SUPER</span>
-                    <span className="material-symbols-outlined text-base">
-                      check_circle
-                    </span>
+                    <IconCheckCircle className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex justify-center mb-1">
-                    <span className="material-symbols-outlined text-4xl text-white/90">
-                      bolt
-                    </span>
+                    <IconZap className="w-10 h-10 text-white/90" />
                   </div>
                   <div className="text-sm font-bold">无限能量</div>
                   <div className="text-xs font-semibold opacity-90">
@@ -426,9 +598,7 @@ export default function Page() {
                   }`}
                 >
                   <div className="flex justify-center mb-1">
-                    <span className="material-symbols-outlined text-3xl text-slate-400">
-                      bolt
-                    </span>
+                    <IconZap className="w-8 h-8 text-slate-400" />
                     <span className="text-lg font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                       +{MAX_ENERGY}
                     </span>
@@ -437,9 +607,7 @@ export default function Page() {
                     恢复能量
                   </div>
                   <div className="flex items-center justify-center gap-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    <span className="material-symbols-outlined text-[14px]">
-                      diamond
-                    </span>
+                    <IconGem className="w-3.5 h-3.5" />
                     <span>{DIAMONDS_FOR_ENERGY_REFILL}</span>
                   </div>
                 </button>
@@ -460,9 +628,7 @@ export default function Page() {
               >
                 {energyRefillChoice === "diamonds" ? (
                   <>
-                    <span className="material-symbols-outlined text-xl">
-                      diamond
-                    </span>
+                    <IconGem className="w-5 h-5" />
                     <span>{DIAMONDS_FOR_ENERGY_REFILL}</span>
                   </>
                 ) : (
@@ -493,7 +659,7 @@ export default function Page() {
                 : "hover:text-gray-800 dark:hover:text-gray-200"
             }`}
           >
-            <span className="material-symbols-outlined text-[26px]">home</span>
+            <IconHome className="w-[26px] h-[26px]" />
             <span className="text-xs font-medium">主页</span>
           </Link>
 

@@ -6,10 +6,13 @@ const STORAGE_KEY = "hellocode-progress-v1";
 
 /** 能量：新用户默认 20，每日 UTC 8:00 若当天有登录则补满 20，不累计 */
 export const DEFAULT_ENERGY = 20;
-export const MAX_ENERGY = 20;
+export const MAX_ENERGY = 25;
 
 /** 每做一道题扣除的能量（可改为 0 方便测试） */
 export const ENERGY_COST_PER_QUESTION = 1;
+
+/** 三星挑战关，每次尝试消耗的能量 */
+export const CHALLENGE_ENERGY_COST = 15;
 
 /** 以 UTC 早上 8 点为界的“自然日”，用于每日补能 */
 export function getRefillDay(date: Date): string {
@@ -36,6 +39,9 @@ export const DEFAULT_DIAMONDS = 9999;
 /** 总经验默认值 */
 export const DEFAULT_XP = 0;
 
+/** 新用户默认时间包数量（挑战倒计时加时道具） */
+export const DEFAULT_TIME_PACKS = 2;
+
 export interface UserProgress {
   lessons: Record<string, LessonProgress>;
   wrongQuestions?: WrongQuestionRecord[];
@@ -55,6 +61,12 @@ export interface UserProgress {
   streakDays?: number;
   /** 连胜弹窗：上次展示的日期，用于一天只弹一次 */
   lastStreakPopupDay?: string;
+  /** 已领取过钻石的部分宝箱（part id 列表，每个部分宝箱只能领一次） */
+  claimedChestParts?: string[];
+  /** 每个部分对应的挑战星数（0-3 星） */
+  challengeStarsByPart?: Record<string, number>;
+  /** 挑战倒计时加时道具：时间包数量 */
+  timePacks?: number;
 }
 
 export function createInitialProgress(): UserProgress {
@@ -100,6 +112,10 @@ export function loadProgress(): UserProgress {
       progress.xp = DEFAULT_XP;
       saveProgress(progress);
     }
+    if (progress.timePacks == null || progress.timePacks === undefined) {
+      progress.timePacks = DEFAULT_TIME_PACKS;
+      saveProgress(progress);
+    }
     return progress;
   } catch {
     return createInitialProgress();
@@ -135,6 +151,17 @@ export function addDiamonds(amount: number): number {
   return next;
 }
 
+/** 消耗指定数量钻石，成功返回 true */
+export function spendDiamonds(amount: number): boolean {
+  const progress = loadProgress();
+  const current = getDiamonds(progress);
+  const cost = Math.max(0, Math.floor(amount));
+  if (current < cost) return false;
+  progress.diamonds = current - cost;
+  saveProgress(progress);
+  return true;
+}
+
 export function getXP(progress: UserProgress): number {
   const v = progress.xp;
   if (v == null || typeof v !== "number") return DEFAULT_XP;
@@ -147,6 +174,32 @@ export function addXP(amount: number): number {
   progress.xp = next;
   saveProgress(progress);
   return next;
+}
+
+/** 当前拥有的时间包数量 */
+export function getTimePacks(progress: UserProgress): number {
+  const v = progress.timePacks;
+  if (v == null || typeof v !== "number") return DEFAULT_TIME_PACKS;
+  return Math.max(0, Math.floor(v));
+}
+
+/** 增加时间包（后续购买等逻辑可复用） */
+export function addTimePacks(amount: number): number {
+  const progress = loadProgress();
+  const next = Math.max(0, getTimePacks(progress) + Math.floor(amount));
+  progress.timePacks = next;
+  saveProgress(progress);
+  return next;
+}
+
+/** 消耗一个时间包，成功返回 true */
+export function spendTimePack(): boolean {
+  const progress = loadProgress();
+  const current = getTimePacks(progress);
+  if (current <= 0) return false;
+  progress.timePacks = current - 1;
+  saveProgress(progress);
+  return true;
 }
 
 /** 花费 600 钻石回满能量，成功返回 true */
@@ -245,6 +298,13 @@ export function getStreakDays(progress: UserProgress): number {
   return Math.max(0, Math.floor(v));
 }
 
+/** 今天是否已完成过至少一关（用于首页火焰是否显示彩色） */
+export function hasPlayedToday(progress: UserProgress): boolean {
+  if (typeof window === "undefined") return false;
+  const today = getRefillDay(new Date());
+  return progress.lastCompletedDay === today;
+}
+
 /** 当前周一到周日对应的 refill 日字符串 */
 function getCurrentWeekRefillDays(): string[] {
   const now = new Date();
@@ -277,5 +337,47 @@ export function markStreakPopupShown(): void {
   const progress = loadProgress();
   progress.lastStreakPopupDay = getRefillDay(new Date());
   saveProgress(progress);
+}
+
+/** 部分宝箱领取的钻石数量 */
+export const CHEST_DIAMONDS_REWARD = 15;
+
+/** 是否已领取过该部分的宝箱 */
+export function hasClaimedPartChest(progress: UserProgress, partId: string): boolean {
+  const list = progress.claimedChestParts ?? [];
+  return list.includes(partId);
+}
+
+/** 领取部分宝箱钻石，成功返回 true，已领过返回 false */
+export function claimPartChest(partId: string): boolean {
+  const progress = loadProgress();
+  if (hasClaimedPartChest(progress, partId)) return false;
+  progress.claimedChestParts = [...(progress.claimedChestParts ?? []), partId];
+  progress.diamonds = (progress.diamonds ?? DEFAULT_DIAMONDS) + CHEST_DIAMONDS_REWARD;
+  saveProgress(progress);
+  return true;
+}
+
+/** 获取某个部分当前的挑战星数（0-3） */
+export function getChallengeStarsForPart(
+  progress: UserProgress,
+  partId: string
+): number {
+  const raw = progress.challengeStarsByPart?.[partId];
+  if (raw == null || typeof raw !== "number") return 0;
+  return Math.max(0, Math.min(3, Math.floor(raw)));
+}
+
+/** 某部分挑战通关后，增加一颗星（最多 3 星），返回最新星数 */
+export function incrementChallengeStarsForPart(partId: string): number {
+  const progress = loadProgress();
+  const current = getChallengeStarsForPart(progress, partId);
+  const next = Math.min(3, current + 1);
+  progress.challengeStarsByPart = {
+    ...(progress.challengeStarsByPart ?? {}),
+    [partId]: next,
+  };
+  saveProgress(progress);
+  return next;
 }
 

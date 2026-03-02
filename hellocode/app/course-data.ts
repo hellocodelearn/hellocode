@@ -1,4 +1,4 @@
-export type QuestionType = "sort" | "order";
+export type QuestionType = "sort" | "order" | "choice" | "true_false";
 
 export interface SortQuestion {
   id: string;
@@ -22,7 +22,30 @@ export interface OrderQuestion {
   correctOrder: string[];
 }
 
-export type Question = SortQuestion | OrderQuestion;
+/** 单选题：题干 + 多个选项，选一个正确答案（概念题） */
+export interface ChoiceQuestion {
+  id: string;
+  type: "choice";
+  title: string;
+  helperText?: string;
+  options: { id: string; label: string }[];
+  correctId: string;
+}
+
+/** 判断题：题干 + 对/错 */
+export interface TrueFalseQuestion {
+  id: string;
+  type: "true_false";
+  title: string;
+  helperText?: string;
+  correct: boolean;
+}
+
+export type Question =
+  | SortQuestion
+  | OrderQuestion
+  | ChoiceQuestion
+  | TrueFalseQuestion;
 
 export interface Lesson {
   id: string;
@@ -39,13 +62,81 @@ export interface Part { id: string; title: string; color: string; lessonIds: str
 export const DEFAULT_LESSON_PLAYS_TO_CLEAR = 5;
 
 const lessonTitles = [
-  "认识 C 语言", "第一个程序", "打印问候语", "输出数字", "练习：姓名",
-  "变量入门", "整数类型", "浮点数", "字符与字符串", "声明练习",
-  "输入输出综合", "算术运算", "优先级", "计算总分", "if 入门",
-  "if-else 结构", "多重 if", "while 入门", "求和练习", "for 入门",
-  "break/continue", "循环综合", "数组基础", "数组遍历", "函数入门",
-  "带参函数", "返回值", "加法函数", "指针初体验", "地址概念",
-  "小项目", "终极挑战"
+  // 1-12  输出相关（拆成两个部分，但主题一致，强调重复）
+  "认识 C 语言",       // 1
+  "第一个程序",       // 2
+  "打印问候语",       // 3
+  "输出数字",         // 4
+  "练习：姓名",       // 5
+  "输出多行文本",     // 6
+  "打印简单菜单",     // 7
+  "输出格式练习",     // 8
+  "打印变量值",       // 9
+  "调试用输出",       // 10
+  "转义字符练习",     // 11
+  "输出综合小测",     // 12
+
+  // 13-24  变量与类型（两个部分，重复巩固）
+  "变量入门",         // 13
+  "整数类型",         // 14
+  "浮点数",           // 15
+  "字符与字符串",     // 16
+  "声明练习",         // 17
+  "多变量声明",       // 18
+  "变量初始化练习",   // 19
+  "变量综合小测",     // 20
+  "常量与变量",       // 21
+  "命名规范",         // 22
+  "类型转换入门",     // 23
+  "变量错误排查",     // 24
+
+  // 25-30  表达式与算术运算
+  "算术运算",         // 25
+  "优先级",           // 26
+  "计算总分",         // 27
+  "表达式综合练习",   // 28
+  "自增自减入门",     // 29
+  "复合赋值练习",     // 30
+
+  // 31-36  条件判断
+  "if 入门",          // 31
+  "if-else 结构",     // 32
+  "多重 if",          // 33
+  "条件判断综合",     // 34
+  "嵌套条件练习",     // 35
+  "分数等级判断",     // 36
+
+  // 37-42  循环入门
+  "while 入门",       // 37
+  "求和练习",         // 38
+  "for 入门",         // 39
+  "循环综合",         // 40
+  "嵌套循环入门",     // 41
+  "循环打印图形",     // 42
+
+  // 43-48  函数入门
+  "函数入门",         // 43
+  "带参函数",         // 44
+  "返回值",           // 45
+  "加法函数",         // 46
+  "函数与变量作用域", // 47
+  "函数综合练习",     // 48
+
+  // 49-54  指针入门
+  "指针初体验",       // 49
+  "地址概念",         // 50
+  "指针与变量",       // 51
+  "指针与数组入门",   // 52
+  "指针改写函数参数", // 53
+  "指针综合小测",     // 54
+
+  // 55-60  综合与挑战（逐步加大难度）
+  "小项目",           // 55
+  "综合复习 1",       // 56
+  "综合复习 2",       // 57
+  "进阶练习",         // 58
+  "进阶挑战",         // 59
+  "终极挑战",         // 60
 ];
 
 // 题库定义
@@ -403,7 +494,65 @@ export const questions: Record<string, Question> = {
     codeTemplate: [{ type: "text", value: "for (i = 0; i < n; i++) printf(\"%d \", " }, { type: "blank", id: "s1" }, { type: "text", value: ");" }],
     options: [{ id: "o1", label: "i" }, { id: "o2", label: "n" }, { id: "o3", label: "i+1" }],
     correctByBlank: { "s1": "o1" }
-  }
+  },
+
+  // --- 单选题（概念题）---
+  "q_choice_main": {
+    id: "q_choice_main", type: "choice", title: "C 语言程序从哪个函数开始执行？",
+    helperText: "选出一个正确答案。",
+    options: [
+      { id: "o1", label: "main" },
+      { id: "o2", label: "start" },
+      { id: "o3", label: "begin" },
+      { id: "o4", label: "run" },
+    ],
+    correctId: "o1",
+  },
+  "q_choice_semicolon": {
+    id: "q_choice_semicolon", type: "choice", title: "C 语言中，每条语句通常以什么符号结束？",
+    options: [
+      { id: "o1", label: "分号 ;" },
+      { id: "o2", label: "句号 。" },
+      { id: "o3", label: "逗号 ，" },
+      { id: "o4", label: "冒号 :" },
+    ],
+    correctId: "o1",
+  },
+  "q_choice_int_type": {
+    id: "q_choice_int_type", type: "choice", title: "要存储整数，应使用哪种数据类型？",
+    options: [
+      { id: "o1", label: "int" },
+      { id: "o2", label: "float" },
+      { id: "o3", label: "char" },
+      { id: "o4", label: "string" },
+    ],
+    correctId: "o1",
+  },
+  "q_choice_loop": {
+    id: "q_choice_loop", type: "choice", title: "for 循环的三个表达式分别控制什么？",
+    helperText: "for (A; B; C) 中 A、B、C 的常见含义。",
+    options: [
+      { id: "o1", label: "初始化；条件；更新" },
+      { id: "o2", label: "条件；初始化；更新" },
+      { id: "o3", label: "更新；条件；初始化" },
+      { id: "o4", label: "条件；更新；初始化" },
+    ],
+    correctId: "o1",
+  },
+
+  // --- 判断题 ---
+  "q_tf_printf": {
+    id: "q_tf_printf", type: "true_false", title: "printf 是 C 语言里用来在屏幕上输出的函数。",
+    correct: true,
+  },
+  "q_tf_float": {
+    id: "q_tf_float", type: "true_false", title: "float 类型只能存储整数。",
+    correct: false,
+  },
+  "q_tf_array_zero": {
+    id: "q_tf_array_zero", type: "true_false", title: "C 语言中数组的下标从 0 开始。",
+    correct: true,
+  },
 };
 
 // --- 2. 知识点标签映射（原子题库分组） ---
@@ -423,6 +572,9 @@ const TAGS: Record<string, string[]> = {
     "q_print_two",
     "q_printf_format",
     "q_loop_print",
+    "q_choice_main",
+    "q_choice_semicolon",
+    "q_tf_printf",
   ],
   // 变量与类型
   vars: [
@@ -438,6 +590,8 @@ const TAGS: Record<string, string[]> = {
     "q_init_var",
     "q_scanf_basic",
     "q_printf_scanf_order",
+    "q_choice_int_type",
+    "q_tf_float",
   ],
   // 表达式与数学
   math: ["q_math_add", "q_mul_before_add", "q_paren_first", "q_sum_three", "q_avg_calc"],
@@ -455,9 +609,10 @@ const TAGS: Record<string, string[]> = {
     "q_loop_array",
     "q_for_arr",
     "q_loop_print",
+    "q_choice_loop",
   ],
   // 数组
-  array: ["q_arr_declare", "q_arr_index", "q_loop_array", "q_for_arr"],
+  array: ["q_arr_declare", "q_arr_index", "q_loop_array", "q_for_arr", "q_tf_array_zero"],
   // 函数
   func: [
     "q_func_return",
@@ -472,39 +627,84 @@ const TAGS: Record<string, string[]> = {
 };
 
 // --- 3. 关卡配置：每关用哪些知识点标签 ---
+// 为了降低每个部分的知识点数量，这里控制大多数关卡只聚焦 1 个主标签，
+// 通过多关重复练习来巩固，最后一部分再做综合挑战。
 const lessonConfigs: Record<string, string[]> = {
+  // 1-12：输出相关 —— 全部只练 output
   "1": ["output"],
   "2": ["output"],
   "3": ["output"],
   "4": ["output"],
   "5": ["output"],
-  "6": ["vars", "output"], // 开始混合旧知识复习
-  "7": ["vars"],
-  "8": ["vars"],
-  "9": ["vars"],
-  "10": ["vars"],
-  "11": ["vars", "output"],
-  "12": ["math", "vars"],
-  "13": ["math"],
-  "14": ["math"],
-  "15": ["logic"],
-  "16": ["logic"],
-  "17": ["logic", "vars"],
-  "18": ["loop"],
-  "19": ["loop", "math"],
-  "20": ["loop"],
-  "21": ["loop"],
-  "22": ["loop", "array"],
-  "23": ["array"],
-  "24": ["array", "loop"],
-  "25": ["func"],
-  "26": ["func"],
-  "27": ["func"],
-  "28": ["func", "math"],
-  "29": ["ptr"],
-  "30": ["ptr", "vars"],
-  "31": ["output", "vars", "logic", "loop", "func"], // 综合关
-  "32": ["output", "vars", "logic", "loop", "func", "ptr"], // 挑战关
+  "6": ["output"],
+  "7": ["output"],
+  "8": ["output"],
+  "9": ["output"],
+  "10": ["output"],
+  "11": ["output"],
+  "12": ["output"],
+
+  // 13-24：变量与类型 —— 聚焦 vars
+  "13": ["vars"],
+  "14": ["vars"],
+  "15": ["vars"],
+  "16": ["vars"],
+  "17": ["vars"],
+  "18": ["vars"],
+  "19": ["vars"],
+  "20": ["vars"],
+  "21": ["vars"],
+  "22": ["vars"],
+  "23": ["vars"],
+  "24": ["vars"],
+
+  // 25-30：表达式与算术运算 —— 聚焦 math
+  "25": ["math"],
+  "26": ["math"],
+  "27": ["math"],
+  "28": ["math"],
+  "29": ["math"],
+  "30": ["math"],
+
+  // 31-36：条件判断 —— 聚焦 logic
+  "31": ["logic"],
+  "32": ["logic"],
+  "33": ["logic"],
+  "34": ["logic"],
+  "35": ["logic"],
+  "36": ["logic"],
+
+  // 37-42：循环相关 —— 聚焦 loop
+  "37": ["loop"],
+  "38": ["loop"],
+  "39": ["loop"],
+  "40": ["loop"],
+  "41": ["loop"],
+  "42": ["loop"],
+
+  // 43-48：函数入门 —— 聚焦 func
+  "43": ["func"],
+  "44": ["func"],
+  "45": ["func"],
+  "46": ["func"],
+  "47": ["func"],
+  "48": ["func"],
+
+  // 49-54：指针初体验 —— 聚焦 ptr
+  "49": ["ptr"],
+  "50": ["ptr"],
+  "51": ["ptr"],
+  "52": ["ptr"],
+  "53": ["ptr"],
+  "54": ["ptr"],
+
+  // 55-60：综合与挑战 —— 适当混合所有已学知识
+  "55": ["output", "vars", "math"],
+  "56": ["output", "vars", "logic"],
+  "57": ["loop", "func"],
+  "58": ["loop", "func", "vars"],
+  "59": ["output", "vars", "logic", "loop", "func"],
+  "60": ["output", "vars", "logic", "loop", "func", "ptr"],
 };
 
 // --- 4. 课程结构：每关只存元信息，具体题目由 getQuestionsForLesson 动态生成 ---
@@ -524,12 +724,31 @@ export const course: Course = {
   ],
 };
 
+// 第一阶段扩展为 10 个部分：
+// - 第 1 部分固定 4 关
+// - 其余部分为 6 或 8 关（偶数），中间都可以插宝箱
+// 总计 60 关。
 export const parts: Part[] = [
-  { id: "part-1", title: "输出入门", color: "#58cc02", lessonIds: ["1", "2", "3", "4", "5"] },
-  { id: "part-2", title: "变量与类型", color: "#1cb0f6", lessonIds: ["6", "7", "8", "9", "10", "11"] },
-  { id: "part-3", title: "表达式与条件", color: "#ff78ca", lessonIds: ["12", "13", "14", "15", "16", "17"] },
-  { id: "part-4", title: "循环与数组", color: "#ffc800", lessonIds: ["18", "19", "20", "21", "22", "23", "24"] },
-  { id: "part-5", title: "函数与进阶", color: "#a855f7", lessonIds: ["25", "26", "27", "28", "29", "30", "31", "32"] },
+  // 输出：1-4
+  { id: "part-1", title: "输出入门 1", color: "#58cc02", lessonIds: ["1", "2", "3", "4"] },
+  // 输出：5-12（8 关）
+  { id: "part-2", title: "输出入门 2", color: "#1cb0f6", lessonIds: ["5", "6", "7", "8", "9", "10", "11", "12"] },
+  // 变量：13-18（6 关）
+  { id: "part-3", title: "变量入门 1", color: "#ff78ca", lessonIds: ["13", "14", "15", "16", "17", "18"] },
+  // 变量：19-24（6 关）
+  { id: "part-4", title: "变量入门 2", color: "#ffc800", lessonIds: ["19", "20", "21", "22", "23", "24"] },
+  // 表达式：25-30（6 关）
+  { id: "part-5", title: "表达式基础", color: "#a855f7", lessonIds: ["25", "26", "27", "28", "29", "30"] },
+  // 条件：31-36（6 关）
+  { id: "part-6", title: "条件判断", color: "#ff4b4b", lessonIds: ["31", "32", "33", "34", "35", "36"] },
+  // 循环：37-42（6 关）
+  { id: "part-7", title: "循环入门", color: "#2b70c9", lessonIds: ["37", "38", "39", "40", "41", "42"] },
+  // 函数：43-48（6 关）
+  { id: "part-8", title: "函数入门", color: "#00b894", lessonIds: ["43", "44", "45", "46", "47", "48"] },
+  // 指针：49-54（6 关）
+  { id: "part-9", title: "指针入门", color: "#fd9644", lessonIds: ["49", "50", "51", "52", "53", "54"] },
+  // 综合：55-60（6 关）
+  { id: "part-10", title: "综合挑战", color: "#9b59b6", lessonIds: ["55", "56", "57", "58", "59", "60"] },
 ];
 
 export function getStage1LessonById(lessonId: string): Lesson | undefined {
