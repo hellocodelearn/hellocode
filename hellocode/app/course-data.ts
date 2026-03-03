@@ -259,9 +259,22 @@ export const questions: Record<string, Question> = {
   },
   "q_string_quote": {
     id: "q_string_quote", type: "sort", title: "C 里字符串用双引号，字符用单引号。补全：",
-    codeTemplate: [{ type: "text", value: "char a = " }, { type: "blank", id: "s1" }, { type: "text", value: "x" }, { type: "blank", id: "s2" }, { type: "text", value: ";" }],
-    options: [{ id: "o1", label: "'" }, { id: "o2", label: '"' }, { id: "o3", label: "`" }],
-    correctByBlank: { "s1": "o1", "s2": "o1" }
+    codeTemplate: [
+      { type: "text", value: "char a = " },
+      { type: "blank", id: "s1" },
+      { type: "text", value: "x" },
+      { type: "blank", id: "s2" },
+      { type: "text", value: ";" }
+    ],
+    options: [
+      { id: "o1", label: "'" },
+      { id: "o2", label: '"' },
+      { id: "o3", label: "`" },
+      { id: "o4", label: "'" },
+      { id: "o5", label: '"' },
+      { id: "o6", label: "`" }
+    ],
+    correctByBlank: { "s1": "o1", "s2": "o4" }
   },
   // 第10关 声明练习
   "q_multi_declare": {
@@ -346,7 +359,7 @@ export const questions: Record<string, Question> = {
     id: "q_elseif_chain", type: "sort", title: "多个条件依次判断：if...else if...最后 else，补全",
     codeTemplate: [{ type: "text", value: "if (a > 0) { } else " }, { type: "blank", id: "s1" }, { type: "text", value: " (a < 0) { } else { }" }],
     options: [{ id: "o1", label: "if" }, { id: "o2", label: "else if" }, { id: "o3", label: "when" }],
-    correctByBlank: { "s1": "o1" }
+    correctByBlank: { "s1": "o2" }
   },
 
   // --- Part 4: 循环与数组 (18-24关) ---
@@ -373,7 +386,8 @@ export const questions: Record<string, Question> = {
     id: "q_while_condition", type: "sort", title: "while 和条件之间可以没有字符或有一个空格，补全",
     codeTemplate: [{ type: "text", value: "while" }, { type: "blank", id: "s1" }, { type: "text", value: "(i < 10)" }],
     options: [{ id: "o1", label: " " }, { id: "o2", label: "" }, { id: "o3", label: "  " }],
-    correctByBlank: { "s1": "o1" }
+    // 允许有一个空格或没有空格，两种写法都算对
+    correctByBlank: { "s1": ["o1", "o2"] }
   },
   // 第20关 for 入门
   "q_for_syntax": {
@@ -555,6 +569,403 @@ export const questions: Record<string, Question> = {
   },
 };
 
+// --- Java 原子题库：结构与 C 语言类似，但代码与关键字改为 Java 写法 ---
+export const javaQuestions: Record<string, Question> = {
+  // 输出入门
+  "java_q_print_basic": {
+    id: "java_q_print_basic",
+    type: "sort",
+    title: "用 System.out.println 输出一行文字",
+    codeTemplate: [
+      { type: "blank", id: "s1" },
+      { type: "text", value: '("Hello, Java");' },
+    ],
+    options: [
+      { id: "o1", label: "System.out.println" },
+      { id: "o2", label: "printf" },
+      { id: "o3", label: "console.log" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "java_q_print_number": {
+    id: "java_q_print_number",
+    type: "sort",
+    title: "用 System.out.println 打印整数 42",
+    codeTemplate: [
+      { type: "blank", id: "s1" },
+      { type: "text", value: "(42);" },
+    ],
+    options: [
+      { id: "o1", label: "System.out.println" },
+      { id: "o2", label: "System.out.print" },
+      { id: "o3", label: "print" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "java_q_string_quotes": {
+    id: "java_q_string_quotes",
+    type: "sort",
+    title: "Java 中字符串要写在双引号里，补全：",
+    codeTemplate: [
+      { type: "text", value: "System.out.println(" },
+      { type: "blank", id: "s1" },
+      { type: "text", value: "Hello" },
+      { type: "blank", id: "s2" },
+      { type: "text", value: ");" },
+    ],
+    options: [
+      { id: "o1", label: '"' },
+      { id: "o2", label: "'" },
+      { id: "o3", label: "`" },
+      { id: "o4", label: '"' },
+      { id: "o5", label: "'" },
+      { id: "o6", label: "`" },
+    ],
+    correctByBlank: { s1: "o1", s2: "o4" },
+  },
+  "java_q_order_main": {
+    id: "java_q_order_main",
+    type: "order",
+    title: "排列语句，写出最小的 Java 主方法",
+    fragments: [
+      { id: "f1", label: "public class Main {" },
+      { id: "f2", label: "public static void main(String[] args) {" },
+      { id: "f3", label: 'System.out.println("Hi");' },
+      { id: "f4", label: "}" },
+      { id: "f5", label: "}" },
+    ],
+    correctOrder: ["f1", "f2", "f3", "f4", "f5"],
+  },
+
+  // 变量与类型
+  "java_q_var_int": {
+    id: "java_q_var_int",
+    type: "sort",
+    title: "在 Java 中声明一个整数变量 age",
+    codeTemplate: [
+      { type: "blank", id: "s1" },
+      { type: "text", value: " age;" },
+    ],
+    options: [
+      { id: "o1", label: "int" },
+      { id: "o2", label: "float" },
+      { id: "o3", label: "String" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "java_q_var_assign": {
+    id: "java_q_var_assign",
+    type: "sort",
+    title: "给变量 x 赋值为 10",
+    codeTemplate: [
+      { type: "text", value: "int x " },
+      { type: "blank", id: "s1" },
+      { type: "text", value: " 10;" },
+    ],
+    options: [
+      { id: "o1", label: "=" },
+      { id: "o2", label: "==" },
+      { id: "o3", label: ":=" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "java_q_choice_type": {
+    id: "java_q_choice_type",
+    type: "choice",
+    title: "在 Java 中存储小数，应该使用哪种类型？",
+    options: [
+      { id: "o1", label: "double" },
+      { id: "o2", label: "int" },
+      { id: "o3", label: "char" },
+      { id: "o4", label: "boolean" },
+    ],
+    correctId: "o1",
+  },
+
+  // 表达式与条件
+  "java_q_add_expr": {
+    id: "java_q_add_expr",
+    type: "sort",
+    title: "完成加法表达式 total = a + b;",
+    codeTemplate: [
+      { type: "text", value: "int total = a " },
+      { type: "blank", id: "s1" },
+      { type: "text", value: " b;" },
+    ],
+    options: [
+      { id: "o1", label: "+" },
+      { id: "o2", label: "plus" },
+      { id: "o3", label: "add" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "java_q_if_basic": {
+    id: "java_q_if_basic",
+    type: "sort",
+    title: "使用 if 判断 score 是否大于等于 60",
+    codeTemplate: [
+      { type: "blank", id: "s1" },
+      { type: "text", value: " (score >= 60) {" },
+    ],
+    options: [
+      { id: "o1", label: "if" },
+      { id: "o2", label: "when" },
+      { id: "o3", label: "check" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+
+  // 循环与数组
+  "java_q_for_basic": {
+    id: "java_q_for_basic",
+    type: "sort",
+    title: "补全 for 循环：从 0 打印到 9",
+    codeTemplate: [
+      { type: "text", value: "for (int i = 0; i < 10; " },
+      { type: "blank", id: "s1" },
+      { type: "text", value: ") {" },
+    ],
+    options: [
+      { id: "o1", label: "i++" },
+      { id: "o2", label: "i+1" },
+      { id: "o3", label: "++" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "java_q_arr_declare": {
+    id: "java_q_arr_declare",
+    type: "sort",
+    title: "声明一个长度为 3 的 int 数组",
+    codeTemplate: [
+      { type: "text", value: "int[] nums = new int" },
+      { type: "blank", id: "s1" },
+      { type: "text", value: ";" },
+    ],
+    options: [
+      { id: "o1", label: "[3]" },
+      { id: "o2", label: "(3)" },
+      { id: "o3", label: "{3}" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+
+  // 函数 / 方法
+  "java_q_method_decl": {
+    id: "java_q_method_decl",
+    type: "sort",
+    title: "补全一个返回 int 的方法 add",
+    codeTemplate: [
+      { type: "blank", id: "s1" },
+      { type: "text", value: " int add(int a, int b) { return a + b; }" },
+    ],
+    options: [
+      { id: "o1", label: "public" },
+      { id: "o2", label: "void" },
+      { id: "o3", label: "static" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "java_q_tf_main": {
+    id: "java_q_tf_main",
+    type: "true_false",
+    title: "Java 程序总是从 main 方法开始执行。",
+    correct: true,
+  },
+};
+
+// --- Python 原子题库 ---
+export const pythonQuestions: Record<string, Question> = {
+  // 输出入门
+  "py_q_print_basic": {
+    id: "py_q_print_basic",
+    type: "sort",
+    title: "在 Python 中，使用哪个函数打印一行文字？",
+    codeTemplate: [
+      { type: "blank", id: "s1" },
+      { type: "text", value: '("Hello, Python")' },
+    ],
+    options: [
+      { id: "o1", label: "print" },
+      { id: "o2", label: "printf" },
+      { id: "o3", label: "console.log" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "py_q_print_number": {
+    id: "py_q_print_number",
+    type: "sort",
+    title: "补全代码：打印数字 42",
+    codeTemplate: [
+      { type: "text", value: "print(" },
+      { type: "blank", id: "s1" },
+      { type: "text", value: ")" },
+    ],
+    options: [
+      { id: "o1", label: "42" },
+      { id: "o2", label: '"42"' },
+      { id: "o3", label: "'42'" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "py_q_string_quotes": {
+    id: "py_q_string_quotes",
+    type: "sort",
+    title: "Python 中字符串可以用双引号，补全：",
+    codeTemplate: [
+      { type: "text", value: "print(" },
+      { type: "blank", id: "s1" },
+      { type: "text", value: "Hello" },
+      { type: "blank", id: "s2" },
+      { type: "text", value: ")" },
+    ],
+    options: [
+      { id: "o1", label: '"' },
+      { id: "o2", label: "'" },
+      { id: "o3", label: "`" },
+      { id: "o4", label: '"' },
+      { id: "o5", label: "'" },
+      { id: "o6", label: "`" },
+    ],
+    correctByBlank: { s1: "o1", s2: "o4" },
+  },
+
+  // 变量与类型
+  "py_q_var_assign": {
+    id: "py_q_var_assign",
+    type: "sort",
+    title: "在 Python 中给变量 x 赋值为 10",
+    codeTemplate: [
+      { type: "text", value: "x " },
+      { type: "blank", id: "s1" },
+      { type: "text", value: " 10" },
+    ],
+    options: [
+      { id: "o1", label: "=" },
+      { id: "o2", label: "==" },
+      { id: "o3", label: ":=" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "py_q_choice_type": {
+    id: "py_q_choice_type",
+    type: "choice",
+    title: "在 Python 中，以下哪种写法可以存储小数？",
+    options: [
+      { id: "o1", label: "pi = 3.14" },
+      { id: "o2", label: "float pi = 3.14" },
+      { id: "o3", label: "double pi = 3.14" },
+      { id: "o4", label: "pi := 3.14" },
+    ],
+    correctId: "o1",
+  },
+
+  // 表达式与条件
+  "py_q_add_expr": {
+    id: "py_q_add_expr",
+    type: "sort",
+    title: "补全加法：total = a ? b",
+    codeTemplate: [
+      { type: "text", value: "total = a " },
+      { type: "blank", id: "s1" },
+      { type: "text", value: " b" },
+    ],
+    options: [
+      { id: "o1", label: "+" },
+      { id: "o2", label: "plus" },
+      { id: "o3", label: "add" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "py_q_if_basic": {
+    id: "py_q_if_basic",
+    type: "sort",
+    title: "使用 if 判断 score 是否大于等于 60，补全：",
+    codeTemplate: [
+      { type: "blank", id: "s1" },
+      { type: "text", value: " score >= 60:" },
+    ],
+    options: [
+      { id: "o1", label: "if" },
+      { id: "o2", label: "when" },
+      { id: "o3", label: "check" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+
+  // 循环与序列
+  "py_q_for_range": {
+    id: "py_q_for_range",
+    type: "sort",
+    title: "用 for 循环打印 0 到 9，补全 range 参数",
+    codeTemplate: [
+      { type: "text", value: "for i in range(" },
+      { type: "blank", id: "s1" },
+      { type: "text", value: "):" },
+    ],
+    options: [
+      { id: "o1", label: "10" },
+      { id: "o2", label: "0, 9" },
+      { id: "o3", label: "1, 10" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "py_q_list_index": {
+    id: "py_q_list_index",
+    type: "sort",
+    title: "列表下标从几开始？补全：nums[?] = 1",
+    codeTemplate: [
+      { type: "text", value: "nums[" },
+      { type: "blank", id: "s1" },
+      { type: "text", value: "] = 1" },
+    ],
+    options: [
+      { id: "o1", label: "0" },
+      { id: "o2", label: "1" },
+      { id: "o3", label: "len(nums)" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+
+  // 函数
+  "py_q_def_func": {
+    id: "py_q_def_func",
+    type: "sort",
+    title: "定义一个函数 add，接受 a 和 b 两个参数",
+    codeTemplate: [
+      { type: "blank", id: "s1" },
+      { type: "text", value: " add(a, b):" },
+    ],
+    options: [
+      { id: "o1", label: "def" },
+      { id: "o2", label: "function" },
+      { id: "o3", label: "fn" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "py_q_return": {
+    id: "py_q_return",
+    type: "sort",
+    title: "在函数里返回 a + b，补全：",
+    codeTemplate: [
+      { type: "text", value: "    " },
+      { type: "blank", id: "s1" },
+      { type: "text", value: " a + b" },
+    ],
+    options: [
+      { id: "o1", label: "return" },
+      { id: "o2", label: "result" },
+      { id: "o3", label: "yield" },
+    ],
+    correctByBlank: { s1: "o1" },
+  },
+  "py_q_tf_indent": {
+    id: "py_q_tf_indent",
+    type: "true_false",
+    title: "在 Python 中，缩进是语法的一部分，写错缩进会报错。",
+    correct: true,
+  },
+};
+
 // --- 2. 知识点标签映射（原子题库分组） ---
 const TAGS: Record<string, string[]> = {
   // 输出相关
@@ -624,6 +1035,30 @@ const TAGS: Record<string, string[]> = {
   ],
   // 指针
   ptr: ["q_ptr_init", "q_address_operator", "q_pointer_deref"],
+};
+
+// Java 题库标签映射（结构与 TAGS 一致）
+const JAVA_TAGS: Record<string, string[]> = {
+  output: ["java_q_print_basic", "java_q_print_number", "java_q_string_quotes", "java_q_order_main"],
+  vars: ["java_q_var_int", "java_q_var_assign", "java_q_choice_type"],
+  math: ["java_q_add_expr"],
+  logic: ["java_q_if_basic"],
+  loop: ["java_q_for_basic"],
+  array: ["java_q_arr_declare"],
+  func: ["java_q_method_decl", "java_q_tf_main"],
+  ptr: [], // Java 入门不涉及裸指针，可留空
+};
+
+// Python 题库标签映射
+const PY_TAGS: Record<string, string[]> = {
+  output: ["py_q_print_basic", "py_q_print_number", "py_q_string_quotes"],
+  vars: ["py_q_var_assign", "py_q_choice_type"],
+  math: ["py_q_add_expr"],
+  logic: ["py_q_if_basic"],
+  loop: ["py_q_for_range"],
+  array: ["py_q_list_index"],
+  func: ["py_q_def_func", "py_q_return", "py_q_tf_indent"],
+  ptr: [], // Python 入门不涉及指针
 };
 
 // --- 3. 关卡配置：每关用哪些知识点标签 ---
@@ -724,6 +1159,40 @@ export const course: Course = {
   ],
 };
 
+// Java 课程结构：与 C 语言保持相同的关卡划分与 lesson 数量
+export const javaCourse: Course = {
+  id: "java-language",
+  name: "Java 入门",
+  stages: [
+    {
+      id: "stage-1",
+      title: "第 1 阶段：基础语法（Java）",
+      lessons: lessonTitles.map((title, index) => ({
+        id: String(index + 1),
+        title,
+        questionIds: [],
+      })),
+    },
+  ],
+};
+
+// Python 课程结构
+export const pythonCourse: Course = {
+  id: "python-language",
+  name: "Python 入门",
+  stages: [
+    {
+      id: "stage-1",
+      title: "第 1 阶段：基础语法（Python）",
+      lessons: lessonTitles.map((title, index) => ({
+        id: String(index + 1),
+        title,
+        questionIds: [],
+      })),
+    },
+  ],
+};
+
 // 第一阶段扩展为 10 个部分：
 // - 第 1 部分固定 4 关
 // - 其余部分为 6 或 8 关（偶数），中间都可以插宝箱
@@ -755,14 +1224,53 @@ export function getStage1LessonById(lessonId: string): Lesson | undefined {
   return course.stages[0].lessons.find((l) => l.id === lessonId);
 }
 
+export function getJavaStage1LessonById(lessonId: string): Lesson | undefined {
+  return javaCourse.stages[0].lessons.find((l) => l.id === lessonId);
+}
+
+export function getPythonStage1LessonById(lessonId: string): Lesson | undefined {
+  return pythonCourse.stages[0].lessons.find((l) => l.id === lessonId);
+}
+
 // --- 5. 原子题库调度：根据标签动态为每关挑题 ---
-export function getQuestionsForLesson(lessonId: string, count = 5): Question[] {
+// 默认每关抽题数量随关卡递增，前期更轻松，后期题量更多，形成类似多邻国的难度曲线。
+function getQuestionsForLessonInternal(
+  lessonId: string,
+  count: number,
+  tagsMap: Record<string, string[]>,
+  questionsMap: Record<string, Question>
+): Question[] {
   const tags = lessonConfigs[lessonId] ?? ["output"];
+
+  // 根据关卡编号调整目标题量：前面关卡题目更少、更多重复，后面逐步增加题目数量。
+  let desiredCount = count;
+  const idNum = Number(lessonId);
+  if (!Number.isNaN(idNum) && count >= 10) {
+    if (idNum <= 4) {
+      // 第 1 部分：入门体验，题目少一些
+      desiredCount = 8;
+    } else if (idNum <= 12) {
+      // 输出相关后半段：逐步加到 10 题
+      desiredCount = 10;
+    } else if (idNum <= 24) {
+      // 变量与类型：12 题，重复巩固
+      desiredCount = 12;
+    } else if (idNum <= 36) {
+      // 表达式和条件：14 题
+      desiredCount = 14;
+    } else if (idNum <= 54) {
+      // 循环、函数、指针：16 题
+      desiredCount = 16;
+    } else {
+      // 综合挑战部分：18 题
+      desiredCount = 18;
+    }
+  }
 
   // 1) 聚合所有关联标签下的题目 ID
   const idSet = new Set<string>();
   for (const tag of tags) {
-    const ids = TAGS[tag];
+    const ids = tagsMap[tag];
     if (!ids) continue;
     ids.forEach((id) => idSet.add(id));
   }
@@ -773,18 +1281,33 @@ export function getQuestionsForLesson(lessonId: string, count = 5): Question[] {
 
   // 3) 映射为题目对象
   let result: Question[] = shuffled
-    .map((id) => questions[id])
+    .map((id) => questionsMap[id])
     .filter((q): q is Question => Boolean(q));
 
   // 4) 如果数量不足，使用 output 池补齐，仍然保证不重复
   if (result.length < count) {
-    const fillerIds = (TAGS["output"] ?? []).filter((id) => !idSet.has(id));
+    const fillerIds = (tagsMap["output"] ?? []).filter((id) => !idSet.has(id));
     const filler = fillerIds
-      .map((id) => questions[id])
+      .map((id) => questionsMap[id])
       .filter((q): q is Question => Boolean(q));
     result = result.concat(filler);
   }
 
-  // 最终保证每关 3–5 道题，这里按调用方的 count 截断
-  return result.slice(0, count);
+  // 最终按关卡难度曲线截断题量
+  return result.slice(0, desiredCount);
+}
+
+// C 语言：保持原有导出签名不变
+export function getQuestionsForLesson(lessonId: string, count = 10): Question[] {
+  return getQuestionsForLessonInternal(lessonId, count, TAGS, questions);
+}
+
+// Java：与 C 语言相同的关卡结构与题量曲线
+export function getQuestionsForLessonJava(lessonId: string, count = 10): Question[] {
+  return getQuestionsForLessonInternal(lessonId, count, JAVA_TAGS, javaQuestions);
+}
+
+// Python：与 C 语言相同的关卡结构与题量曲线
+export function getQuestionsForLessonPython(lessonId: string, count = 10): Question[] {
+  return getQuestionsForLessonInternal(lessonId, count, PY_TAGS, pythonQuestions);
 }

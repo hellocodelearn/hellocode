@@ -2,18 +2,29 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { getQuestionsForLesson, getStage1LessonById, Question, SortQuestion, ChoiceQuestion, TrueFalseQuestion } from "@/app/course-data";
 import {
-  IconChevronUp,
-  IconChevronDown,
+  getQuestionsForLesson,
+  getQuestionsForLessonJava,
+  getQuestionsForLessonPython,
+  getStage1LessonById,
+  Question,
+  SortQuestion,
+  ChoiceQuestion,
+  TrueFalseQuestion,
+} from "@/app/course-data";
+import {
   IconCheckCircle,
   IconXCircle,
   IconX,
   IconZap,
   IconGem,
   IconFlame,
-  IconGift,
 } from "@/app/components/icons";
+import { ChoiceOptions, OrderQuestionBody } from "@/app/components/question-templates";
+import {
+  TreasureChestClaimedIcon,
+  TreasureChestReadyIcon,
+} from "@/app/components/treasure-chest-icon";
 import {
   addDiamonds,
   addXP,
@@ -32,7 +43,24 @@ import {
   getCompletedDaysForWeek,
   shouldShowStreakPopupToday,
   markStreakPopupShown,
+  getDailyCompletedUnits,
+  incrementDailyCompletedUnits,
+  getDailyXP,
+  saveProgress,
+  getDailyHighAccuracyUnits,
+  incrementDailyHighAccuracyUnits,
+  getDailyCompletedParts,
+  getPreferredLanguage,
+  isSuperSubscribed,
+  setSuperSubscribed,
 } from "@/app/user-progress";
+import { getMonthPrimaryColor } from "@/app/theme";
+import { useGameSounds } from "@/app/hooks/useGameSounds";
+import {
+  isIOSPlatform,
+  restoreSuper,
+  subscribeSuper,
+} from "@/app/lib/subscription";
 
 type CheckState = "idle" | "correct" | "wrong";
 
@@ -72,22 +100,37 @@ function OrderQuestionUI({
   onWrong: () => void;
   onContinue: () => void;
 }) {
-  const [orderIds, setOrderIds] = useState<string[]>(() =>
-    question.fragments.map((f) => f.id)
-  );
+  const [orderIds, setOrderIds] = useState<string[]>(() => {
+    const ids = question.fragments.map((f) => f.id);
+    // 打乱初始顺序，避免一上来就是正确答案
+    const shuffled = [...ids];
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  });
   const [localCheckState, setLocalCheckState] = useState<CheckState>("idle");
   const [localMessage, setLocalMessage] = useState<string | null>(null);
-  const moveUp = (index: number) => {
-    if (index <= 0) return;
-    const newOrder = [...orderIds];
-    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-    setOrderIds(newOrder);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  const handleDragStart = (index: number) => {
+    setDragIndex(index);
   };
-  const moveDown = (index: number) => {
-    if (index >= orderIds.length - 1) return;
-    const newOrder = [...orderIds];
-    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-    setOrderIds(newOrder);
+
+  const handleDragOver = (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+  };
+
+  const handleDrop = (index: number) => {
+    if (dragIndex == null || dragIndex === index) return;
+    setOrderIds((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(index, 0, moved);
+      return next;
+    });
+    setDragIndex(null);
   };
   const handleOrderCheck = () => {
     const correctOrder = question.correctOrder;
@@ -125,45 +168,20 @@ function OrderQuestionUI({
           </div>
           <div className="relative p-4 border-2 border-slate-200 dark:border-slate-600 rounded-2xl rounded-bl-none bg-white dark:bg-slate-800 mb-4 shadow-sm">
             <p className="text-slate-600 dark:text-slate-300 font-bold text-sm">
-              {question.helperText ?? "点击上移/下移调整顺序！"}
+              {question.helperText ?? "点击右侧拖动条调整顺序！"}
             </p>
           </div>
         </div>
         <div className="flex flex-col gap-4 w-full">
-          {orderIds.map((fragmentId, index) => {
-            const fragment = question.fragments.find((f) => f.id === fragmentId);
-            if (!fragment) return null;
-            return (
-              <div
-                key={fragment.id}
-                className="flex items-center justify-between gap-2 p-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 border-b-4 rounded-2xl shadow-sm"
-              >
-                <span className="text-lg font-bold text-slate-700 dark:text-slate-200 font-mono flex-1">
-                  {fragment.label}
-                </span>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => moveUp(index)}
-                    disabled={index === 0}
-                    className="p-2 rounded-xl border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-600"
-                    aria-label="上移"
-                  >
-                    <IconChevronUp className="w-5 h-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveDown(index)}
-                    disabled={index === orderIds.length - 1}
-                    className="p-2 rounded-xl border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-600"
-                    aria-label="下移"
-                  >
-                    <IconChevronDown className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          <OrderQuestionBody
+            question={question}
+            orderIds={orderIds}
+            activeIndex={dragIndex}
+            disabled={localCheckState !== "idle"}
+            onDragStart={handleDragStart}
+            onDragOver={(e) => handleDragOver(e)}
+            onDrop={handleDrop}
+          />
         </div>
 
         {localCheckState === "idle" ? (
@@ -273,29 +291,15 @@ function ChoiceQuestionUI({
           </div>
         </div>
         <div className="flex flex-col gap-3 w-full">
-          {question.options.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => {
-                if (localCheckState !== "idle") return;
-                setSelectedId(opt.id);
-              }}
-              className={`w-full text-left px-5 py-4 rounded-2xl border-2 border-b-4 font-semibold text-base transition-all ${
-                localCheckState !== "idle"
-                  ? selectedId === opt.id
-                    ? opt.id === question.correctId
-                      ? "bg-[#d7ffb8] border-[#58cc02] border-b-[#46a302] text-[#225500]"
-                      : "bg-[#fee2e2] border-red-400 border-b-red-600 text-red-800"
-                    : "bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500"
-                  : selectedId === opt.id
-                    ? "bg-[#58cc02]/15 border-[#58cc02] border-b-[#46a302] text-slate-800 dark:text-slate-100"
-                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+          <ChoiceOptions
+            question={question}
+            selectedId={selectedId}
+            disabled={localCheckState !== "idle"}
+            onSelect={(id) => {
+              if (localCheckState !== "idle") return;
+              setSelectedId(id);
+            }}
+          />
         </div>
 
         {localCheckState === "idle" ? (
@@ -495,11 +499,24 @@ export default function LessonPageClient() {
   const params = useParams<{ lessonId: string }>();
   const lessonId = params.lessonId;
   const lesson = getStage1LessonById(lessonId);
+  const monthPrimaryColor = getMonthPrimaryColor();
+  const { playComplete, playDiamond, playFailure, playStar, playSuccess } = useGameSounds();
+  const searchParams = useSearchParams();
+  const langParam = searchParams.get("lang");
+  const progressForLang = loadProgress();
+  const preferredLang = getPreferredLanguage(progressForLang);
+  const lang: "c" | "java" | "python" =
+    langParam === "java"
+      ? "java"
+      : langParam === "python"
+      ? "python"
+      : preferredLang;
 
-  const allQuestions: Question[] = useMemo(
-    () => getQuestionsForLesson(lessonId),
-    [lessonId]
-  );
+  const allQuestions: Question[] = useMemo(() => {
+    if (lang === "java") return getQuestionsForLessonJava(lessonId);
+    if (lang === "python") return getQuestionsForLessonPython(lessonId);
+    return getQuestionsForLesson(lessonId);
+  }, [lessonId, lang]);
 
   const [startTimestamp] = useState(() => Date.now());
   const [roundQuestionIds, setRoundQuestionIds] = useState<string[]>(() =>
@@ -527,13 +544,65 @@ export default function LessonPageClient() {
   const [energyRefillChoice, setEnergyRefillChoice] = useState<"super" | "diamonds">("super");
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
   const [showSubscriptionOffer, setShowSubscriptionOffer] = useState(false);
+  const [showTaskMissionPopup, setShowTaskMissionPopup] = useState(false);
+  const [taskProgressAnimated, setTaskProgressAnimated] = useState(false);
+  const [firstTaskType, setFirstTaskType] = useState<"xp" | "units">("xp");
   const [showDiamondClaim, setShowDiamondClaim] = useState(false);
   const [showStreakPopup, setShowStreakPopup] = useState(false);
   const [diamondDisplayCount, setDiamondDisplayCount] = useState(0);
   const diamondClaimInitialRef = useRef<number>(0);
-  const searchParams = useSearchParams();
   const sessionMode = searchParams.get("mode") === "review" ? "review" : "learn";
   const DIAMONDS_REWARD = 15;
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [isSuperUser, setIsSuperUser] = useState<boolean>(() =>
+    isSuperSubscribed(loadProgress())
+  );
+  const isIOS = isIOSPlatform();
+
+  const handleSuperSubscribe = async () => {
+    if (isSuperUser || isSubscribing) {
+      setShowSubscriptionOffer(false);
+      setShowOutOfEnergyModal(false);
+      return;
+    }
+    setIsSubscribing(true);
+    try {
+      const ok = await subscribeSuper();
+      if (ok) {
+        setSuperSubscribed(true);
+        setIsSuperUser(true);
+        setEnergy(MAX_ENERGY);
+        setShowOutOfEnergyModal(false);
+        setShowSubscriptionOffer(false);
+        if (sessionMode === "review") {
+          router.push("/");
+        } else {
+          playStar();
+          setShowTaskMissionPopup(true);
+        }
+      }
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
+
+  const handleSuperRestore = async () => {
+    if (!isIOS || isRestoring || isSuperUser) return;
+    setIsRestoring(true);
+    try {
+      const ok = await restoreSuper();
+      if (ok) {
+        setSuperSubscribed(true);
+        setIsSuperUser(true);
+        setEnergy(MAX_ENERGY);
+        setShowOutOfEnergyModal(false);
+        setShowSubscriptionOffer(false);
+      }
+    } finally {
+      setIsRestoring(false);
+    }
+  };
 
   useEffect(() => {
     if (!showDiamondClaim) return;
@@ -576,6 +645,32 @@ export default function LessonPageClient() {
     setIsRetryWrongRound(false);
     setEnergy(getEnergy(loadProgress()));
   }, [lessonId, allQuestions]);
+
+  // 特别任务弹窗内进度条动画：先渲染为 0%，再在下一帧填充到目标值
+  useEffect(() => {
+    if (!showTaskMissionPopup) {
+      setTaskProgressAnimated(false);
+      return;
+    }
+    const id = window.setTimeout(() => {
+      setTaskProgressAnimated(true);
+    }, 40);
+    return () => window.clearTimeout(id);
+  }, [showTaskMissionPopup]);
+
+  // 特别任务：第一行任务类型每日随机一次，并持久化在 progress.specialFirstTaskType
+  useEffect(() => {
+    if (!showTaskMissionPopup) return;
+    const progress = loadProgress();
+    if (progress.specialFirstTaskType === "xp" || progress.specialFirstTaskType === "units") {
+      setFirstTaskType(progress.specialFirstTaskType);
+      return;
+    }
+    const chosen: "xp" | "units" = Math.random() < 0.5 ? "xp" : "units";
+    progress.specialFirstTaskType = chosen;
+    saveProgress(progress);
+    setFirstTaskType(chosen);
+  }, [showTaskMissionPopup]);
 
   const handleOptionClick = (optionId: string) => {
     setCheckState("idle");
@@ -642,6 +737,7 @@ export default function LessonPageClient() {
             Math.max(1, Math.round((Date.now() - startTimestamp) / 1000))
           );
           setShowResultScreen(true);
+          playComplete();
         }
       }
     } else {
@@ -659,6 +755,7 @@ export default function LessonPageClient() {
     const sortQuestion = question as SortQuestion;
     if (blankIds.some((id) => !filled[id])) {
       setCheckState("wrong");
+      playFailure();
       setMessage(pickRandom(NEGATIVE_MESSAGES_INCOMPLETE));
       return;
     }
@@ -693,11 +790,13 @@ export default function LessonPageClient() {
         );
       }
       setCheckState("wrong");
+      playFailure();
       setMessage(pickRandom(NEGATIVE_MESSAGES_WRONG));
       return;
     }
 
     setCheckState("correct");
+    playSuccess();
     setMessage(pickRandom(POSITIVE_MESSAGES));
   };
 
@@ -807,7 +906,9 @@ export default function LessonPageClient() {
                   <IconZap className="w-[14px] h-[14px] text-white font-bold" />
                   <div className="absolute top-0.5 left-0.5 w-[60%] h-[3px] bg-white/30 rounded-full" />
                 </div>
-                <span className="font-extrabold text-xl leading-none">{energy}</span>
+                <span className="font-extrabold text-xl leading-none">
+                  {isSuperUser ? "MAX" : energy}
+                </span>
               </div>
             </div>
           </div>
@@ -817,8 +918,8 @@ export default function LessonPageClient() {
           <>
             {/* 结算页 */}
             <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32 bg-gradient-to-b from-sky-50 via-white to-white dark:from-slate-900 dark:via-slate-950 dark:to-slate-950">
-              <div className="mb-6">
-                <div className="w-32 h-32 rounded-full bg-[#0ea5e9] flex items-center justify-center shadow-lg">
+              <div className="mb-6 mt-4">
+                <div className="w-32 h-32 rounded-full bg-[#1cb0f6] flex items-center justify-center shadow-lg">
                   <img
                     src="/robot-mascot.svg"
                     alt="通关助手机器人"
@@ -826,31 +927,91 @@ export default function LessonPageClient() {
                   />
                 </div>
               </div>
-              <h1 className="text-2xl font-extrabold text-sky-600 dark:text-sky-300 mb-1">
+              <h1 className="text-[24px] font-extrabold text-[#1cb0f6] mb-1">
                 当之无愧代码之星！
               </h1>
               <p className="text-sm text-slate-500 dark:text-slate-300 mb-5">
                 本关卡中，你完成了 {allQuestions.length} 道编程挑战。
               </p>
 
-              <div className="flex gap-3 mb-10 w-full">
-                <div className="flex-1 rounded-2xl bg-[#fff7d1] px-3 py-2 flex flex-col items-center shadow-sm">
-                  <span className="text-xs text-slate-500 mb-1">总经验</span>
-                  <div className="flex items-center gap-1 font-extrabold text-[#f4b400]">
-                    <IconZap className="w-4 h-4" />
-                    <span>{computedXP}</span>
+              <div className="flex gap-3 mb-12 w-full">
+                {/* 总经验 */}
+                <div className="flex-1">
+                  <div className="rounded-2xl bg-[#FFD93B] px-3 pt-2 pb-2.5 flex flex-col items-stretch shadow-sm">
+                    <span className="text-xs font-bold text-white mb-1">
+                      总经验
+                    </span>
+                    <div className="rounded-xl bg-white flex items-center justify-center py-1.5">
+                      <div className="flex items-center gap-1.5 font-extrabold text-[#F4B400] text-sm">
+                        <svg
+                          viewBox="0 0 1024 1024"
+                          className="w-4 h-4"
+                          aria-hidden
+                        >
+                          <path
+                            d="M377.9 114.1h358.3l-136.4 268 231.5 0.3-485.1 559.3 139.5-356.4H222.6z"
+                            fill="#FED928"
+                          />
+                        </svg>
+                        <span>{computedXP}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex-1 rounded-2xl bg-[#e1f7ff] px-3 py-2 flex flex-col items-center shadow-sm">
-                  <span className="text-xs text-slate-500 mb-1">首轮正确率</span>
-                  <div className="font-extrabold text-[#1cb0f6] text-sm">
-                    {firstRoundAccuracyPercent}%
+
+                {/* 稳扎稳打（首轮正确率） */}
+                <div className="flex-1">
+                  <div className="rounded-2xl bg-[#78C800] px-3 pt-2 pb-2.5 flex flex-col items-stretch shadow-sm">
+                    <span className="text-xs font-bold text-white mb-1">
+                      稳扎稳打
+                    </span>
+                    <div className="rounded-xl bg-white flex items-center justify-center py-1.5">
+                      <div className="flex items-center gap-1.5 font-extrabold text-[#57CB02] text-sm">
+                        <svg
+                          viewBox="0 0 1024 1024"
+                          className="w-4 h-4"
+                          aria-hidden
+                        >
+                          <path
+                            d="M494.22 906.81c-208.41 0-377.29-168.88-377.29-377.29s168.88-377.28 377.29-377.28c75.46 0 147.32 21.56 208.41 61.09 7.19 7.19 10.78 17.97 3.59 28.74-7.19 7.19-17.97 7.19-25.16 3.59-53.89-39.52-118.57-57.49-186.84-57.49-186.85 0-337.76 154.51-337.76 341.35 0 186.85 154.51 341.36 341.36 341.36 186.84 0 341.36-154.51 341.36-341.36 0-64.68-21.56-129.35-57.49-186.84-7.19-7.19-3.59-17.97 3.59-25.16 7.18-7.19 17.96-3.59 25.15 3.59 39.53 61.09 61.09 132.95 61.09 208.41-0.02 208.4-168.89 377.29-377.3 377.29z"
+                            fill="#57CB02"
+                          />
+                          <path
+                            d="M494.22 619.35c-50.31 0-89.83-39.53-89.83-89.83s39.53-89.83 89.83-89.83 89.83 39.53 89.83 89.83-39.53 89.83-89.83 89.83z m0-143.73c-28.75 0-53.9 25.15-53.9 53.89 0 28.75 25.15 53.9 53.9 53.9 28.74 0 53.89-25.15 53.89-53.9 0-28.74-25.15-53.89-53.89-53.89z"
+                            fill="#57CB02"
+                          />
+                          <path
+                            d="M494.22 547.49c-3.59 0-10.78 0-14.38-3.59-7.19-7.19-7.19-17.97 0-25.16L763.7 234.88V170.2c0-7.19 0-10.78 3.6-14.37l71.86-71.86c7.19-3.59 14.37-3.59 21.56-3.59 7.19 3.59 10.78 10.78 10.78 17.96v53.9h53.9c7.19 0 17.96 3.59 17.96 10.78 0 7.19 0 14.37-3.59 21.56l-71.86 71.86c-3.59 0-10.78 3.6-14.37 3.6h-64.68L508.59 543.89c-3.59 3.6-10.78 3.6-14.37 3.6z"
+                            fill="#57CB02"
+                          />
+                        </svg>
+                        <span>{firstRoundAccuracyPercent}%</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex-1 rounded-2xl bg-[#e9ddff] px-3 py-2 flex flex-col items-center shadow-sm">
-                  <span className="text-xs text-slate-500 mb-1">通关用时</span>
-                  <div className="font-extrabold text-[#7c3aed] text-sm">
-                    {formattedElapsedTime}
+
+                {/* 熟练快手（通关用时） */}
+                <div className="flex-1">
+                  <div className="rounded-2xl bg-[#1CB0F6] px-3 pt-2 pb-2.5 flex flex-col items-stretch shadow-sm">
+                    <span className="text-xs font-bold text-white mb-1">
+                      熟练快手
+                    </span>
+                    <div className="rounded-xl bg-white flex items-center justify-center py-1.5">
+                      <div className="flex items-center gap-1.5 font-extrabold text-[#1cb0f6] text-sm">
+                        <svg
+                          viewBox="0 0 1024 1024"
+                          className="w-4 h-4"
+                          aria-hidden
+                        >
+                          <path
+                            d="M511.936 0.832l15.936 0.256A511.744 511.744 0 0 1 1023.04 512l-0.256 15.936a511.744 511.744 0 0 1-510.72 495.104l-16-0.256A511.744 511.744 0 0 1 0.704 512l0.256-15.936A511.744 511.744 0 0 1 512 0.832z m-23.04 214.72A42.624 42.624 0 0 0 448 256.384v298.24c0 15.744 19.584 28.992 32.384 36.288 3.52 5.376 13.248 10.176 19.2 13.568l175.68 106.496c20.416 11.648 42.432 4.736 54.208-15.616 11.712-20.352 0.768-46.336-19.648-58.112L533.184 535.04V256.384a42.624 42.624 0 0 0-44.352-40.832z"
+                            fill="#1CB0F6"
+                          />
+                        </svg>
+                        <span>{formattedElapsedTime}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -863,9 +1024,23 @@ export default function LessonPageClient() {
                   type="button"
                   onClick={() => {
                     recordLessonCompletion();
+                    incrementDailyCompletedUnits();
+                    if (firstRoundAccuracyPercent >= 90) {
+                      incrementDailyHighAccuracyUnits();
+                    }
                     addXP(computedXP);
                     setShowResultScreen(false);
-                    setShowSubscriptionOffer(true);
+                    const progress = loadProgress();
+                    if (isSuperSubscribed(progress)) {
+                      if (sessionMode === "review") {
+                        router.push("/");
+                      } else {
+                        playStar();
+                        setShowTaskMissionPopup(true);
+                      }
+                    } else {
+                      setShowSubscriptionOffer(true);
+                    }
                   }}
                   className="w-full font-extrabold text-lg uppercase tracking-wider py-3.5 rounded-2xl border-b-4 active:border-b-0 active:translate-y-1 shadow-lg transition-all bg-[#1cb0f6] hover:bg-[#1990d8] text-white border-[#1990d8]"
                 >
@@ -938,10 +1113,12 @@ export default function LessonPageClient() {
             question={question}
             lesson={lesson}
             onCorrect={() => {
+              playSuccess();
               setCheckState("correct");
               setMessage(pickRandom(POSITIVE_MESSAGES));
             }}
             onWrong={() => {
+              playFailure();
               setHasWrongInRound(true);
               setWrongRoundQuestionIds((prev) =>
                 question && !prev.includes(question.id) ? [...prev, question.id] : prev
@@ -961,10 +1138,12 @@ export default function LessonPageClient() {
             question={question}
             lesson={lesson}
             onCorrect={() => {
+              playSuccess();
               setCheckState("correct");
               setMessage(pickRandom(POSITIVE_MESSAGES));
             }}
             onWrong={() => {
+              playFailure();
               setHasWrongInRound(true);
               setWrongRoundQuestionIds((prev) =>
                 question && !prev.includes(question.id) ? [...prev, question.id] : prev
@@ -984,10 +1163,12 @@ export default function LessonPageClient() {
             question={question}
             lesson={lesson}
             onCorrect={() => {
+              playSuccess();
               setCheckState("correct");
               setMessage(pickRandom(POSITIVE_MESSAGES));
             }}
             onWrong={() => {
+              playFailure();
               setHasWrongInRound(true);
               setWrongRoundQuestionIds((prev) =>
                 question && !prev.includes(question.id) ? [...prev, question.id] : prev
@@ -1214,7 +1395,7 @@ export default function LessonPageClient() {
         )}
 
         {/* 能量用完了：底部弹窗 */}
-        {showOutOfEnergyModal && (
+        {showOutOfEnergyModal && !isSuperUser && (
           <>
             <div
               className="absolute inset-0 bg-black/50 z-30"
@@ -1295,14 +1476,21 @@ export default function LessonPageClient() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (energyRefillChoice === "diamonds" && spendDiamondsForEnergyRefill()) {
+                    if (
+                      energyRefillChoice === "diamonds" &&
+                      spendDiamondsForEnergyRefill()
+                    ) {
                       setEnergy(MAX_ENERGY);
                       setShowOutOfEnergyModal(false);
                     } else if (energyRefillChoice === "super") {
-                      setShowOutOfEnergyModal(false);
+                      void handleSuperSubscribe();
                     }
                   }}
-                  disabled={energyRefillChoice === "diamonds" && getDiamonds(loadProgress()) < DIAMONDS_FOR_ENERGY_REFILL}
+                  disabled={
+                    (energyRefillChoice === "diamonds" &&
+                      getDiamonds(loadProgress()) < DIAMONDS_FOR_ENERGY_REFILL) ||
+                    (energyRefillChoice === "super" && isSubscribing)
+                  }
                   className="w-full py-3.5 rounded-2xl bg-[#1cb0f6] hover:bg-[#1990d8] text-white font-extrabold text-base uppercase tracking-wider mb-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {energyRefillChoice === "diamonds" ? (
@@ -1310,6 +1498,8 @@ export default function LessonPageClient() {
                       <IconGem className="w-5 h-5" />
                       <span>{DIAMONDS_FOR_ENERGY_REFILL}</span>
                     </>
+                  ) : isSubscribing ? (
+                    "处理中..."
                   ) : (
                     "订阅 SUPER HELLOCODE"
                   )}
@@ -1384,10 +1574,10 @@ export default function LessonPageClient() {
           </>
         )}
 
-        {/* 通关后先弹出的 7 天 Super 试用页，同款深色渐变 + 机器人，关闭后再展示结算页 */}
-        {showSubscriptionOffer && (
+        {/* 通关后先弹出的 7 天 Super 试用页，同款深色渐变 + 机器人，关闭后再展示任务弹窗 */}
+        {showSubscriptionOffer && !isSuperUser && (
           <div
-            className="fixed inset-0 z-50 flex flex-col text-white"
+            className="fixed inset-0 z-50 flex flex-col text-white pt-safe"
             style={{
               background: "linear-gradient(180deg, #0f766e 0%, #155e75 35%, #1e3a8a 70%, #4c1d95 100%)",
             }}
@@ -1400,6 +1590,15 @@ export default function LessonPageClient() {
             >
               SUPER
             </span>
+            {isIOS && (
+              <button
+                type="button"
+                onClick={handleSuperRestore}
+                className="absolute top-6 right-24 text-xs text-white/70 underline-offset-2 hover:text-white"
+              >
+                {isRestoring ? "恢复中..." : "恢复购买"}
+              </button>
+            )}
             <div className="flex-1 flex flex-col items-center justify-center px-5 pt-14 pb-8 w-full max-w-md mx-auto">
               <h1 className="text-xl font-extrabold text-white text-center mb-6 w-full">
                 免费领取 7 天 Super 体验
@@ -1429,16 +1628,12 @@ export default function LessonPageClient() {
               <button
                 type="button"
                 onClick={() => {
-                  setShowSubscriptionOffer(false);
-                  if (sessionMode === "review") router.push("/");
-                  else {
-                    setDiamondDisplayCount(getDiamonds(loadProgress()));
-                    setShowDiamondClaim(true);
-                  }
+                  void handleSuperSubscribe();
                 }}
-                className="w-full py-3.5 rounded-2xl bg-white text-slate-900 font-bold text-base mb-3"
+                disabled={isSubscribing}
+                className="w-full py-3.5 rounded-2xl bg-white text-slate-900 font-bold text-base mb-3 disabled:opacity-60 disabled:cursor-wait"
               >
-                ¥0.00 领取体验
+                {isSubscribing ? "处理中..." : "¥0.00 领取体验"}
               </button>
               <button
                 type="button"
@@ -1446,8 +1641,8 @@ export default function LessonPageClient() {
                   setShowSubscriptionOffer(false);
                   if (sessionMode === "review") router.push("/");
                   else {
-                    setDiamondDisplayCount(getDiamonds(loadProgress()));
-                    setShowDiamondClaim(true);
+                    playStar();
+                    setShowTaskMissionPopup(true);
                   }
                 }}
                 className="w-full text-center text-white/90 text-sm py-2"
@@ -1457,6 +1652,166 @@ export default function LessonPageClient() {
             </div>
           </div>
         )}
+
+        {/* 特别任务弹窗：在订阅页之后、领取宝石页之前 */}
+        {showTaskMissionPopup && (() => {
+          const progress = loadProgress();
+          const unitsToday = getDailyCompletedUnits(progress);
+          const xpToday = getDailyXP(progress);
+          const highAccToday = getDailyHighAccuracyUnits(progress);
+          const partsToday = getDailyCompletedParts(progress);
+
+          const xpTask = {
+            title: "获取 20 经验",
+            current: xpToday,
+            target: 20,
+            completed: xpToday >= 20,
+            rewardDiamonds: 25,
+          } as const;
+          const unitTask = {
+            title: "完成 2 个单元",
+            current: unitsToday,
+            target: 2,
+            completed: unitsToday >= 2,
+            rewardDiamonds: 25,
+          } as const;
+          const highAccuracyTask = {
+            title: "1 个单元至少答对 90%",
+            current: highAccToday,
+            target: 1,
+            completed: highAccToday >= 1,
+            rewardDiamonds: 50,
+          } as const;
+          const partTask = {
+            title: "学完一个部分",
+            current: partsToday,
+            target: 1,
+            completed: partsToday >= 1,
+            rewardDiamonds: 100,
+          } as const;
+
+          // 第一行在「经验 / 单元」里随机，其余两行固定顺序：第二行为 90% 单元，第三行为学完一个部分
+          const firstTask = firstTaskType === "xp" ? xpTask : unitTask;
+          const tasks = [firstTask, highAccuracyTask, partTask] as const;
+
+          return (
+            <div className="fixed inset-0 z-[58] flex flex-col items-center justify-center bg-white dark:bg-[#101922] px-6">
+              <div className="flex flex-col items-center flex-1 justify-center w-full max-w-sm">
+                <p
+                  className="text-[24px] font-extrabold mb-6 text-center"
+                  style={{ color: monthPrimaryColor }}
+                >
+                  +1 个特别任务点数!
+                </p>
+
+                {/* 任务列表卡片 */}
+                <div className="w-full rounded-3xl bg-white dark:bg-[#0f172a] shadow-[0_8px_0_rgba(15,23,42,0.12)] border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  {tasks.map((task, index) => {
+                    const progressRatio = Math.min(1, task.current / task.target);
+                    const animatedWidth = task.completed
+                      ? progressRatio * 100
+                      : taskProgressAnimated
+                      ? progressRatio * 100
+                      : 0;
+                    const isLast = index === tasks.length - 1;
+                    const ChestIcon = task.completed
+                      ? TreasureChestClaimedIcon
+                      : TreasureChestReadyIcon;
+                    return (
+                      <div
+                        // eslint-disable-next-line react/no-array-index-key
+                        key={index}
+                        className={`px-4 py-3 flex items-center gap-3 ${
+                          !isLast ? "border-b border-slate-100 dark:border-slate-800" : ""
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                            {task.title}
+                          </div>
+                          <div className="mt-1 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${animatedWidth}%`,
+                                backgroundColor: monthPrimaryColor,
+                              }}
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                            {Math.min(task.current, task.target)} / {task.target}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <div className="flex flex-col items-center gap-1">
+                            <ChestIcon className="w-9 h-9" />
+                            {task.completed && (
+                              <div className="flex items-center gap-1 text-xs font-extrabold text-[#1cb0f6] animate-pulse">
+                                <span>+{task.rewardDiamonds}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* 底部特别任务条目（无阴影） */}
+                  <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                        三月特别任务
+                      </div>
+                      <div className="text-base font-bold text-slate-800 dark:text-slate-100">
+                        1 / 25
+                      </div>
+                    </div>
+                    {/* 黄色指针星星图标 */}
+                    <svg
+                      viewBox="0 0 1029 1024"
+                      className="w-10 h-10 flex-shrink-0"
+                      aria-hidden
+                    >
+                      <path
+                        d="M571.904 153.6S542.72 153.6 517.12 286.72s-133.12 163.84-168.96 225.28c-26.112 44.544 5.12 174.08-25.6 240.64s-78.336 122.88-70.144 143.36c8.704 20.48 16.896 52.224 253.44-81.408l239.104 105.984S803.84 911.36 798.72 855.04s-34.816-214.528-34.816-214.528L926.72 465.92s51.2-79.36-43.52-93.184c-94.72-14.336-200.192-30.72-200.192-30.72L571.904 153.6z"
+                        fill="#FFC800"
+                      />
+                      <path
+                        d="M655.36 184.32s-56.32 5.12-81.92 125.952-133.12 148.992-168.96 204.8c-26.112 40.448 5.12 158.208-25.6 218.624S300.544 844.8 308.736 863.744c8.704 18.432 16.896 47.616 253.44-73.728l239.104 96.256s58.88-8.192 53.76-59.392-34.816-195.072-34.816-195.072l162.816-158.72s51.2-72.192-43.52-84.992c-94.72-12.8-200.192-27.648-200.192-27.648L655.36 184.32z"
+                        fill="#FFC800"
+                      />
+                      <path
+                        d="M813.568 897.024c-6.656 0-13.312-1.024-19.968-3.584l6.656-19.456c13.312 4.608 27.648 2.048 38.912-7.168 10.752-9.216 15.872-23.04 13.312-37.376l-31.232-181.248c-3.584-19.456 3.072-39.424 17.408-53.76l131.584-128c11.264-10.752 14.848-26.112 10.24-40.96-4.608-14.848-16.896-25.088-32.256-27.136l-33.28-4.608 3.072-20.48 33.28 4.608c23.04 3.584 41.472 18.944 48.64 40.96 7.168 22.016 1.536 45.568-15.36 61.952l-131.584 128c-9.216 9.216-13.824 22.528-11.264 35.328l31.232 181.248c3.584 21.504-4.096 42.496-20.48 56.32-11.264 10.752-24.576 15.36-38.912 15.36zM738.816 360.448c-7.168-5.632-13.312-12.8-17.408-21.504L640 174.592c-5.632-11.264-15.36-18.944-27.136-21.504-12.288-2.56-25.088 0.512-34.304 8.192l-13.312-15.872c13.824-11.776 33.28-16.384 51.712-12.288 17.92 3.584 33.28 15.872 41.472 32.256l81.408 164.864c2.56 5.632 6.656 10.24 11.776 13.824l-12.8 16.384zM221.184 362.496c-1.024-5.632 3.072-10.752 8.704-11.776l39.936-6.144c5.632-1.024 10.752 3.072 11.776 8.704 1.024 5.632-3.072 10.752-8.704 11.776l-39.936 6.144c-5.632 0.512-10.752-3.072-11.776-8.704z"
+                        fill="#020202"
+                      />
+                      <path
+                        d="M285.184 930.816c-13.312 0-27.136-4.096-38.4-12.8-20.48-14.848-30.208-39.424-26.112-64l33.792-198.656c2.56-14.336-2.56-29.184-12.8-39.936L97.792 475.136c-19.968-19.456-25.6-49.664-12.8-75.776 9.728-19.456 29.184-32.768 50.688-35.84l33.28-4.608c5.632-1.024 10.752 3.072 11.776 8.704 1.024 5.632-3.072 10.752-8.704 11.776L138.24 384c-16.384 2.56-31.232 12.8-36.864 28.672-6.656 17.408-2.56 35.328 10.752 48.128L256 601.088c15.36 14.848 22.528 36.864 18.944 57.856L240.64 857.6c-3.072 17.408 3.584 33.792 17.92 44.032s31.744 11.776 47.104 3.584l178.176-93.696c18.944-10.24 41.984-10.24 60.928 0l178.176 93.696c15.36 8.192 33.28 6.656 47.104-3.584 14.336-10.24 20.992-26.624 17.92-44.032l-33.792-198.656c-3.584-20.992 3.584-43.008 18.944-57.856L917.504 460.8c13.312-12.8 16.896-31.232 10.752-48.128-6.144-15.36-20.48-26.112-36.864-28.672l-197.632-28.672c-21.504-3.072-39.424-16.384-49.152-35.84l-88.576-179.2c-7.168-14.848-22.016-25.6-38.4-26.112-18.432-1.024-34.816 8.704-42.496 25.088L385.024 319.488c-7.68 15.872-21.504 27.136-37.376 32.768-6.144 2.048-12.288-2.048-13.312-8.192-0.512-4.608 2.048-9.728 6.656-11.264 11.264-3.584 20.48-11.776 25.6-22.528L455.68 129.536c11.264-22.528 33.28-36.352 58.368-36.352s47.616 13.824 58.368 36.352l89.088 180.736c6.656 13.312 18.944 22.528 33.792 24.576l199.168 29.184c24.576 3.584 45.056 20.48 52.736 44.544 7.68 24.064 1.536 49.664-16.384 67.072l-144.384 140.8c-10.752 10.24-15.36 25.088-12.8 39.936l33.792 198.656c4.608 27.648-8.192 55.296-34.304 69.12-19.456 10.24-43.008 9.216-61.952-1.024L535.552 829.44c-13.312-6.656-28.672-6.656-41.984 0l-178.176 93.696c-9.728 5.12-19.968 7.68-30.208 7.68z"
+                        fill="#020202"
+                      />
+                      <path
+                        d="M772.096 230.912l-18.432-68.096-64.512-14.336 64.512-19.456 20.48-61.44 18.432 61.44 64.512 21.504-65.024 12.288-19.968 68.096z m-43.008-83.968l32.768 7.68 10.752 39.424 11.776-39.424 32.256-6.144-32.768-10.752-10.752-35.84-11.776 35.84-32.256 9.216zM708.608 818.688l-28.672-111.104c-1.536-5.632 2.048-11.264 7.168-12.288 5.632-1.536 11.264 2.048 12.288 7.168l28.672 111.104c1.536 5.632-2.048 11.264-7.168 12.288z"
+                        fill="#020202"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full px-6 pb-10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTaskMissionPopup(false);
+                    setShowDiamondClaim(true);
+                  }}
+                  className="w-full py-3.5 rounded-2xl bg-[#1cb0f6] hover:bg-[#1990d8] text-white font-extrabold text-base"
+                >
+                  继续
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 连胜战绩弹窗：领取钻石后、一天只弹一次 */}
         {showStreakPopup && (() => {
@@ -1541,17 +1896,9 @@ export default function LessonPageClient() {
             ))}
 
             <div className="flex flex-col items-center flex-1 justify-center">
-              {/* 宝箱 */}
-              <div className="relative w-40 h-28 mb-6 flex items-end justify-center">
-                <div
-                  className="w-28 h-22 rounded-t-xl rounded-b-lg border-[3px] flex items-center justify-center shadow-xl"
-                  style={{
-                    borderColor: "#92400e",
-                    background: "linear-gradient(180deg, #b45309 0%, #78350f 100%)",
-                  }}
-                >
-                  <IconGift className="w-10 h-10 text-amber-200/80" />
-                </div>
+              {/* 宝箱（使用主页“已领取”同款图标） */}
+              <div className="relative mb-6 flex items-center justify-center">
+                <TreasureChestClaimedIcon className="w-28 h-28" />
               </div>
               <p className="text-xl font-bold text-slate-800 dark:text-slate-100 text-center">
                 你已赚取 {DIAMONDS_REWARD} 颗宝石!
@@ -1562,6 +1909,7 @@ export default function LessonPageClient() {
                 type="button"
                 onClick={() => {
                   addDiamonds(DIAMONDS_REWARD);
+                  playDiamond();
                   setShowDiamondClaim(false);
                   const p = loadProgress();
                   if (shouldShowStreakPopupToday(p)) {

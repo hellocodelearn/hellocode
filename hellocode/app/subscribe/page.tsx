@@ -13,10 +13,59 @@ import {
   IconKey,
   IconHome,
 } from "@/app/components/icons";
+import {
+  isSuperSubscribed,
+  loadProgress,
+  setSuperSubscribed,
+} from "@/app/user-progress";
+import {
+  isIOSPlatform,
+  restoreSuper,
+  subscribeSuper,
+} from "@/app/lib/subscription";
 
 export default function SubscribePage() {
   const pathname = usePathname();
   const [showClaimModal, setShowClaimModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState<boolean>(() =>
+    isSuperSubscribed(loadProgress())
+  );
+  const isIOS = isIOSPlatform();
+
+  const handleSubscribe = async () => {
+    if (isSubscribed || isProcessing) {
+      setShowClaimModal(false);
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const ok = await subscribeSuper();
+      if (ok) {
+        setSuperSubscribed(true);
+        setIsSubscribed(true);
+        setShowClaimModal(false);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!isIOS || isRestoring) return;
+    setIsRestoring(true);
+    try {
+      const ok = await restoreSuper();
+      if (ok) {
+        setSuperSubscribed(true);
+        setIsSubscribed(true);
+        setShowClaimModal(false);
+      }
+    } finally {
+      setIsRestoring(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#f5f7f8] dark:bg-[#101922] flex flex-col pb-20">
@@ -68,18 +117,22 @@ export default function SubscribePage() {
           <div className="px-5 pb-5">
             <button
               type="button"
-              onClick={() => setShowClaimModal(true)}
-              className="w-full py-3 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 text-[#0ea5e9] font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+              onClick={() => {
+                if (isSubscribed) return;
+                setShowClaimModal(true);
+              }}
+              disabled={isSubscribed}
+              className="w-full py-3 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 text-[#0ea5e9] font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors disabled:opacity-60 disabled:cursor-default"
             >
-              ¥0.00 就能体验 SUPER!
+              {isSubscribed ? "已订阅 SUPER" : "¥0.00 就能体验 SUPER!"}
             </button>
           </div>
         </div>
       </div>
 
       {/* 领取体验弹窗：长页面可滚动，底部按钮固定 */}
-      {showClaimModal && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-[#101922]">
+      {showClaimModal && !isSubscribed && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-[#101922] pt-safe">
           <div className="flex-1 overflow-y-auto">
             {/* 顶部渐变区 + 标题 + 吉祥物 */}
             <div
@@ -96,6 +149,15 @@ export default function SubscribePage() {
               >
                 SUPER
               </span>
+              {isIOS && (
+                <button
+                  type="button"
+                  onClick={handleRestore}
+                  className="absolute top-4 right-24 text-xs text-white/70 underline-offset-2 hover:text-white"
+                >
+                  {isRestoring ? "恢复中..." : "恢复购买"}
+                </button>
+              )}
               <h2 className="text-xl font-extrabold text-white mt-2 pr-16 leading-tight">
                 Super 会员 C 语言课程
                 <br />
@@ -195,9 +257,11 @@ export default function SubscribePage() {
           <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 bg-white dark:bg-[#1a2632] border-t border-slate-100 dark:border-slate-800 safe-area-pb">
             <button
               type="button"
-              className="w-full max-w-md mx-auto block py-3.5 rounded-2xl bg-[#1cb0f6] hover:bg-[#1990d8] text-white font-bold text-base"
+              onClick={handleSubscribe}
+              disabled={isProcessing}
+              className="w-full max-w-md mx-auto block py-3.5 rounded-2xl bg-[#1cb0f6] hover:bg-[#1990d8] text-white font-bold text-base disabled:opacity-60 disabled:cursor-wait"
             >
-              ¥0.00 领取体验
+              {isProcessing ? "处理中..." : "¥0.00 领取体验"}
             </button>
             <button
               type="button"

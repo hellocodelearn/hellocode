@@ -33,8 +33,9 @@ export interface WrongQuestionRecord {
 /** 花费钻石回满能量所需数量 */
 export const DIAMONDS_FOR_ENERGY_REFILL = 600;
 
-/** 新用户默认钻石数 */
-export const DEFAULT_DIAMONDS = 9999;
+/** 新用户默认钻石数（dev 模式下默认 0） */
+export const DEFAULT_DIAMONDS =
+  process.env.NODE_ENV === "development" ? 9999 : 0;
 
 /** 总经验默认值 */
 export const DEFAULT_XP = 0;
@@ -47,6 +48,8 @@ export interface UserProgress {
   wrongQuestions?: WrongQuestionRecord[];
   /** 当前能量 0~20 */
   energy?: number;
+  /** 是否已订阅 Super（苹果内购） */
+  isSuperSubscribed?: boolean;
   /** 上次补能的 UTC 自然日 (YYYY-MM-DD)，以 8:00 为界 */
   lastRefillUtcDay?: string;
   /** 钻石数量 */
@@ -67,6 +70,22 @@ export interface UserProgress {
   challengeStarsByPart?: Record<string, number>;
   /** 挑战倒计时加时道具：时间包数量 */
   timePacks?: number;
+  /** 特别任务：记录哪一天的每日任务统计（YYYY-MM-DD，按 getRefillDay 计算） */
+  specialMissionDay?: string;
+  /** 特别任务：当日完成的单元数量（进入结算并点击“领取经验”的次数） */
+  specialUnitsCompletedToday?: number;
+  /** 特别任务：当日获取的经验总和 */
+  specialXpEarnedToday?: number;
+  /** 特别任务：当日第一行任务类型（"xp" | "units"） */
+  specialFirstTaskType?: "xp" | "units";
+  /** 特别任务：当日首轮正确率 ≥90% 的单元数量 */
+  specialHighAccuracyUnitsToday?: number;
+  /** 特别任务：当日学完的部分数量 */
+  specialPartsCompletedToday?: number;
+  /** 是否已经看过新手引导（选科目弹窗） */
+  hasSeenOnboarding?: boolean;
+  /** 选定的编程语言："c" | "java" | "python"，默认 "c" */
+  preferredLanguage?: "c" | "java" | "python";
 }
 
 export function createInitialProgress(): UserProgress {
@@ -123,6 +142,9 @@ export function loadProgress(): UserProgress {
 }
 
 export function getEnergy(progress: UserProgress): number {
+  if (progress.isSuperSubscribed) {
+    return MAX_ENERGY;
+  }
   const v = progress.energy;
   if (v == null || typeof v !== "number") return DEFAULT_ENERGY;
   return Math.max(0, Math.min(MAX_ENERGY, Math.floor(v)));
@@ -130,6 +152,9 @@ export function getEnergy(progress: UserProgress): number {
 
 export function deductEnergy(amount: number): number {
   const progress = loadProgress();
+  if (progress.isSuperSubscribed) {
+    return MAX_ENERGY;
+  }
   const next = Math.max(0, getEnergy(progress) - amount);
   progress.energy = next;
   saveProgress(progress);
@@ -170,10 +195,111 @@ export function getXP(progress: UserProgress): number {
 
 export function addXP(amount: number): number {
   const progress = loadProgress();
+  const today = getRefillDay(new Date());
+  if (progress.specialMissionDay !== today) {
+    progress.specialMissionDay = today;
+    progress.specialUnitsCompletedToday = 0;
+    progress.specialXpEarnedToday = 0;
+    progress.specialHighAccuracyUnitsToday = 0;
+    progress.specialPartsCompletedToday = 0;
+  }
+  const delta = Math.max(0, Math.floor(amount));
   const next = Math.max(0, getXP(progress) + Math.max(0, Math.floor(amount)));
   progress.xp = next;
+  const currentXpToday = progress.specialXpEarnedToday ?? 0;
+  progress.specialXpEarnedToday = currentXpToday + delta;
   saveProgress(progress);
   return next;
+}
+
+/** 特别任务：当日完成单元 +1，返回最新数量 */
+export function incrementDailyCompletedUnits(): number {
+  const progress = loadProgress();
+  const today = getRefillDay(new Date());
+  if (progress.specialMissionDay !== today) {
+    progress.specialMissionDay = today;
+    progress.specialUnitsCompletedToday = 0;
+    progress.specialXpEarnedToday = 0;
+    progress.specialHighAccuracyUnitsToday = 0;
+    progress.specialPartsCompletedToday = 0;
+  }
+  const current = progress.specialUnitsCompletedToday ?? 0;
+  const next = current + 1;
+  progress.specialUnitsCompletedToday = next;
+  saveProgress(progress);
+  return next;
+}
+
+/** 特别任务：获取今天完成的单元数量 */
+export function getDailyCompletedUnits(progress: UserProgress): number {
+  const today = getRefillDay(new Date());
+  if (progress.specialMissionDay !== today) return 0;
+  const v = progress.specialUnitsCompletedToday;
+  if (v == null || typeof v !== "number") return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** 特别任务：获取今天累计经验（用于“获取 20 经验”任务） */
+export function getDailyXP(progress: UserProgress): number {
+  const today = getRefillDay(new Date());
+  if (progress.specialMissionDay !== today) return 0;
+  const v = progress.specialXpEarnedToday;
+  if (v == null || typeof v !== "number") return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** 特别任务：高正确率单元 +1（首轮正确率 ≥90%） */
+export function incrementDailyHighAccuracyUnits(): number {
+  const progress = loadProgress();
+  const today = getRefillDay(new Date());
+  if (progress.specialMissionDay !== today) {
+    progress.specialMissionDay = today;
+    progress.specialUnitsCompletedToday = 0;
+    progress.specialXpEarnedToday = 0;
+    progress.specialHighAccuracyUnitsToday = 0;
+    progress.specialPartsCompletedToday = 0;
+  }
+  const current = progress.specialHighAccuracyUnitsToday ?? 0;
+  const next = current + 1;
+  progress.specialHighAccuracyUnitsToday = next;
+  saveProgress(progress);
+  return next;
+}
+
+/** 特别任务：获取今天高正确率单元数量 */
+export function getDailyHighAccuracyUnits(progress: UserProgress): number {
+  const today = getRefillDay(new Date());
+  if (progress.specialMissionDay !== today) return 0;
+  const v = progress.specialHighAccuracyUnitsToday;
+  if (v == null || typeof v !== "number") return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** 特别任务：学完一个部分 +1（当前用宝箱领取作为完成标志） */
+export function incrementDailyCompletedParts(): number {
+  const progress = loadProgress();
+  const today = getRefillDay(new Date());
+  if (progress.specialMissionDay !== today) {
+    progress.specialMissionDay = today;
+    progress.specialUnitsCompletedToday = 0;
+    progress.specialXpEarnedToday = 0;
+    progress.specialHighAccuracyUnitsToday = 0;
+    progress.specialPartsCompletedToday = 0;
+  }
+  const current = progress.specialPartsCompletedToday ?? 0;
+  const next = current + 1;
+  progress.specialPartsCompletedToday = next;
+  saveProgress(progress);
+  return next;
+}
+
+/** 特别任务：获取今天完成的部分数量 */
+export function getDailyCompletedParts(progress: UserProgress): number {
+  const today = getRefillDay(new Date());
+  if (progress.specialMissionDay !== today) return 0;
+  const v = progress.specialPartsCompletedToday;
+  if (v == null || typeof v !== "number") return 0;
+  return Math.max(0, Math.floor(v));
 }
 
 /** 当前拥有的时间包数量 */
@@ -205,6 +331,9 @@ export function spendTimePack(): boolean {
 /** 花费 600 钻石回满能量，成功返回 true */
 export function spendDiamondsForEnergyRefill(): boolean {
   const progress = loadProgress();
+  if (progress.isSuperSubscribed) {
+    return false;
+  }
   const diamonds = getDiamonds(progress);
   if (diamonds < DIAMONDS_FOR_ENERGY_REFILL) return false;
   progress.diamonds = diamonds - DIAMONDS_FOR_ENERGY_REFILL;
@@ -220,6 +349,49 @@ export function saveProgress(progress: UserProgress): void {
   } catch {
     // ignore
   }
+}
+
+/** 新手引导：是否已经看过选科目引导 */
+export function hasSeenOnboarding(progress: UserProgress): boolean {
+  return Boolean(progress.hasSeenOnboarding);
+}
+
+/** 新手引导：标记已看过选科目引导 */
+export function markOnboardingSeen(): void {
+  const progress = loadProgress();
+  if (progress.hasSeenOnboarding) return;
+  progress.hasSeenOnboarding = true;
+  saveProgress(progress);
+}
+
+/** 用户当前选择的编程语言（默认 C） */
+export function getPreferredLanguage(progress: UserProgress): "c" | "java" | "python" {
+  const v = progress.preferredLanguage;
+  if (v === "java" || v === "python") return v;
+  return "c";
+}
+
+/** 设置用户的编程语言偏好 */
+export function setPreferredLanguage(lang: "c" | "java" | "python"): void {
+  const progress = loadProgress();
+  progress.preferredLanguage = lang;
+  saveProgress(progress);
+}
+
+/** 是否已经是 Super 订阅用户 */
+export function isSuperSubscribed(progress: UserProgress): boolean {
+  return Boolean(progress.isSuperSubscribed);
+}
+
+/** 标记 Super 订阅状态（成功购买或恢复购买后调用） */
+export function setSuperSubscribed(active: boolean): void {
+  const progress = loadProgress();
+  progress.isSuperSubscribed = active;
+  if (active) {
+    // 订阅用户电量永远视为满格
+    progress.energy = MAX_ENERGY;
+  }
+  saveProgress(progress);
 }
 
 export function getLessonPlays(progress: UserProgress, lessonId: string): number {
@@ -354,6 +526,16 @@ export function claimPartChest(partId: string): boolean {
   if (hasClaimedPartChest(progress, partId)) return false;
   progress.claimedChestParts = [...(progress.claimedChestParts ?? []), partId];
   progress.diamonds = (progress.diamonds ?? DEFAULT_DIAMONDS) + CHEST_DIAMONDS_REWARD;
+  // 特别任务：把领取宝箱视为“学完一个部分”
+  const today = getRefillDay(new Date());
+  if (progress.specialMissionDay !== today) {
+    progress.specialMissionDay = today;
+    progress.specialUnitsCompletedToday = 0;
+    progress.specialXpEarnedToday = 0;
+    progress.specialHighAccuracyUnitsToday = 0;
+    progress.specialPartsCompletedToday = 0;
+  }
+  progress.specialPartsCompletedToday = (progress.specialPartsCompletedToday ?? 0) + 1;
   saveProgress(progress);
   return true;
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getStage1LessonById, parts, Part } from "@/app/course-data";
 import {
   IconStar,
@@ -39,8 +39,55 @@ import {
   spendDiamondsForEnergyRefill,
   DIAMONDS_FOR_ENERGY_REFILL,
   getChallengeStarsForPart,
+  hasSeenOnboarding,
+  markOnboardingSeen,
+  getPreferredLanguage,
+  setPreferredLanguage,
+  isSuperSubscribed,
 } from "@/app/user-progress";
+import { useGameSounds } from "@/app/hooks/useGameSounds";
+import { NewUserOnboarding } from "@/app/components/NewUserOnboarding";
 //
+function LanguageIcon({ lang }: { lang: "c" | "java" | "python" }) {
+  if (lang === "java") {
+    return (
+      <svg viewBox="0 0 1024 1024" className="w-[16px] h-[16px]" aria-hidden>
+        <path
+          d="M725.952 170.048c-29.248 20.096-56.704 38.4-87.808 62.208-23.744 18.24-65.792 45.696-67.648 78.592-3.648 53.056 78.656 102.4 34.752 170.048-16.448 25.6-43.904 36.608-78.592 53.056-3.712-7.296 9.088-14.656 14.592-21.952 54.848-78.656-56.704-104.256-42.048-201.152 14.656-96.896 124.352-128 226.752-140.8z"
+          fill="#FF1515"
+        />
+        <path
+          d="M563.2 0c16.448 16.448 29.248 47.552 29.248 78.656 0 96.896-102.4 151.744-151.744 215.744-11.008 14.656-25.6 36.544-25.6 60.352 0 52.992 54.848 111.552 74.944 153.6C457.152 486.4 415.104 455.296 384 420.48 354.752 384 323.648 327.296 351.104 276.096c40.192-74.944 162.688-120.64 206.592-201.152 11.008-20.096 20.096-51.2 5.504-74.944z"
+          fill="#FF1515"
+        />
+      </svg>
+    );
+  }
+  if (lang === "python") {
+    return (
+      <svg viewBox="0 0 1024 1024" className="w-[16px] h-[16px]" aria-hidden>
+        <path
+          d="M420.693333 85.333333C353.28 85.333333 298.666667 139.946667 298.666667 207.36v71.68h183.04c16.64 0 30.293333 24.32 30.293333 40.96H207.36C139.946667 320 85.333333 374.613333 85.333333 442.026667v161.322666c0 67.413333 54.613333 122.026667 122.026667 122.026667h50.346667v-114.346667c0-67.413333 54.186667-122.026667 121.6-122.026666h224c67.413333 0 122.026667-54.229333 122.026666-121.642667V207.36C725.333333 139.946667 670.72 85.333333 603.306667 85.333333z m-30.72 68.693334c17.066667 0 30.72 5.12 30.72 30.293333s-13.653333 38.016-30.72 38.016c-16.64 0-30.293333-12.8-30.293333-37.973333s13.653333-30.336 30.293333-30.336z"
+          fill="#3C78AA"
+        />
+        <path
+          d="M766.250667 298.666667v114.346666a121.6 121.6 0 0 1-121.6 121.984H420.693333A121.6 121.6 0 0 0 298.666667 656.597333v160a122.026667 122.026667 0 0 0 122.026666 122.026667h182.613334A122.026667 122.026667 0 0 0 725.333333 816.64v-71.68h-183.082666c-16.64 0-30.250667-24.32-30.250667-40.96h304.64A122.026667 122.026667 0 0 0 938.666667 581.973333v-161.28a122.026667 122.026667 0 0 0-122.026667-122.026666zM354.986667 491.221333l-0.170667 0.170667c0.512-0.085333 1.066667-0.042667 1.621333-0.170667z m279.04 310.442667c16.64 0 30.293333 12.8 30.293333 37.973333a30.293333 30.293333 0 0 1-30.293333 30.293334c-17.066667 0-30.72-5.12-30.72-30.293334s13.653333-37.973333 30.72-37.973333z"
+          fill="#FDD835"
+        />
+      </svg>
+    );
+  }
+  // C 语言
+  return (
+    <svg viewBox="0 0 1024 1024" className="w-[16px] h-[16px]" aria-hidden>
+      <path
+        d="M896 1024H128a128 128 0 0 1-128-128V128a128 128 0 0 1 128-128h768a128 128 0 0 1 128 128v768a128 128 0 0 1-128 128z m0-896H128v768h768z m-256 64a64 64 0 0 1 0 128c-33.92-5.76-5.76 0-64 0a175.36 175.36 0 0 0-192 192c0 168.96 90.24 192 192 192 60.16 0 7.04 7.68 64 0a64 64 0 0 1 0 128c-372.48 14.72-384-199.04-384-320-3.84-211.84 121.6-320 384-320z"
+        fill="#1296db"
+      />
+    </svg>
+  );
+}
+
 function computeLessonState(
   progress: UserProgress,
   lessonId: string
@@ -282,12 +329,44 @@ export default function Page() {
   const [popupAnchor, setPopupAnchor] = useState<{ centerX: number; bottom: number } | null>(
     null
   );
+  const prevProgressRef = useRef<UserProgress | null>(null);
+  const { playStar } = useGameSounds();
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     if (pathname !== "/") return;
-    const id = setTimeout(() => setProgress(loadProgress()), 0);
+    const id = setTimeout(() => {
+      const latest = loadProgress();
+      setProgress(latest);
+      if (!hasSeenOnboarding(latest)) {
+        setShowOnboarding(true);
+      }
+    }, 0);
     return () => clearTimeout(id);
   }, [pathname]);
+
+  // 回到首页时，如果某个部分的挑战星星数量较上一次有提升，播放一次星星音效
+  useEffect(() => {
+    if (pathname !== "/") return;
+    const prev = prevProgressRef.current;
+    if (!prev) {
+      prevProgressRef.current = progress;
+      return;
+    }
+    let hasStarIncreased = false;
+    for (const part of parts) {
+      const before = getChallengeStarsForPart(prev, part.id);
+      const now = getChallengeStarsForPart(progress, part.id);
+      if (now > before) {
+        hasStarIncreased = true;
+        break;
+      }
+    }
+    prevProgressRef.current = progress;
+    if (hasStarIncreased) {
+      playStar();
+    }
+  }, [pathname, progress, playStar]);
 
   const selectedPart = selectedPartId
     ? parts.find((p) => p.id === selectedPartId) ?? null
@@ -298,20 +377,28 @@ export default function Page() {
   const isReview = Boolean(selectedState?.isCleared);
   const rewardXp = selectedLessonId ? (isReview ? 15 : 20) : 0;
   const unitIndex = selectedState ? Math.min(selectedState.plays + 1, PLAYS_TO_CLEAR) : 1;
+  const preferredLang = getPreferredLanguage(progress);
 
   return (
-    <div className="h-screen bg-[#f5f7fb] text-[#3c3c3c] dark:bg-[#131f24] dark:text-slate-100 flex flex-col overflow-hidden">
+    <div className="h-screen bg-[#f5f7fb] text-[#3c3c3c] dark:bg-[#131f24] dark:text-slate-100 flex flex-col overflow-hidden pt-safe">
       {/* 顶部状态栏（固定） */}
-      <header className="fixed top-0 left-0 right-0 z-20 bg-[#f5f7fb] dark:bg-[#131f24]">
+      <header className="fixed top-0 left-0 right-0 z-20 bg-[#f5f7fb] dark:bg-[#131f24] pt-safe">
         <div className="mx-auto max-w-md px-4 pt-3 pb-2 flex text-[13px] font-semibold">
           {/* 语言等级 */}
           <div className="w-1/4 flex items-center gap-1">
-            <span className="text-[18px] rounded-md bg-white/70 px-1 shadow-sm">
-              C语言
-            </span>
-            <span className="font-extrabold text-xl leading-none">
-              1
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center justify-center rounded-md bg-white/70 px-1 shadow-sm">
+                <LanguageIcon lang={preferredLang} />
+              </span>
+              <span className="text-[13px] font-semibold">
+                {preferredLang === "c"
+                  ? "C 语言"
+                  : preferredLang === "java"
+                  ? "Java"
+                  : "Python"}
+              </span>
+            </div>
+            <span className="font-extrabold text-xl leading-none ml-1">1</span>
           </div>
 
           {/* 连胜火焰 */}
@@ -338,7 +425,7 @@ export default function Page() {
           <div className="w-1/4 flex items-center gap-1 text-[#ff78ca]">
             <IconBattery className="w-[18px] h-[18px] leading-none text-[#1cb0f6]" />
             <span className="font-extrabold text-xl leading-none">
-              {getEnergy(progress)}
+              {isSuperSubscribed(progress) ? "MAX" : getEnergy(progress)}
             </span>
           </div>
         </div>
@@ -465,6 +552,23 @@ export default function Page() {
         </div>
       </main>
 
+      {/* 新手引导：选科目（仅新用户第一次进入首页时弹出） */}
+      {showOnboarding && (
+        <NewUserOnboarding
+          onDone={(lang) => {
+            markOnboardingSeen();
+            setPreferredLanguage(lang);
+            setShowOnboarding(false);
+            // 完成新手引导后，直接进入第 1 部分第 1 单元，附带语言参数
+            if (parts.length > 0 && parts[0].lessonIds.length > 0) {
+              const firstLessonId = parts[0].lessonIds[0];
+              const url = `/lesson/${firstLessonId}?mode=learn&rewardXp=20&unit=1&lang=${lang}`;
+              router.push(url);
+            }
+          }}
+        />
+      )}
+
       {/* 学习弹窗：在关卡下方，向上尖角对准该关卡；点击其他区域关闭 */}
       {selectedLessonId && selectedPart && selectedLesson && selectedState && popupAnchor && (
         <>
@@ -514,7 +618,7 @@ export default function Page() {
                 type="button"
                 onClick={() => {
                   const mode = isReview ? "review" : "learn";
-                  const url = `/lesson/${selectedLessonId}?mode=${mode}&rewardXp=${rewardXp}&unit=${unitIndex}`;
+                  const url = `/lesson/${selectedLessonId}?mode=${mode}&rewardXp=${rewardXp}&unit=${unitIndex}&lang=${preferredLang}`;
                   setSelectedLessonId(null);
                   setSelectedPartId(null);
                   setPopupAnchor(null);
@@ -535,7 +639,7 @@ export default function Page() {
       )}
 
       {/* 能量不足：底部弹窗（与局内同一套） */}
-      {showOutOfEnergyModal && (
+      {showOutOfEnergyModal && !isSuperSubscribed(loadProgress()) && (
         <>
           <div
             className="fixed inset-0 bg-black/50 z-30"
@@ -616,14 +720,22 @@ export default function Page() {
               <button
                 type="button"
                 onClick={() => {
-                  if (energyRefillChoice === "diamonds" && spendDiamondsForEnergyRefill()) {
+                  if (
+                    energyRefillChoice === "diamonds" &&
+                    spendDiamondsForEnergyRefill()
+                  ) {
                     setProgress(loadProgress());
                     setShowOutOfEnergyModal(false);
                   } else if (energyRefillChoice === "super") {
+                    // 主页能量用尽时，引导到订阅页，由订阅页发起真正的内购
                     setShowOutOfEnergyModal(false);
+                    window.location.href = "/subscribe";
                   }
                 }}
-                disabled={energyRefillChoice === "diamonds" && getDiamonds(loadProgress()) < DIAMONDS_FOR_ENERGY_REFILL}
+                disabled={
+                  energyRefillChoice === "diamonds" &&
+                  getDiamonds(loadProgress()) < DIAMONDS_FOR_ENERGY_REFILL
+                }
                 className="w-full py-3.5 rounded-2xl bg-[#1cb0f6] hover:bg-[#1990d8] text-white font-extrabold text-base uppercase tracking-wider mb-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {energyRefillChoice === "diamonds" ? (

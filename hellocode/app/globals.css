@@ -27,6 +27,21 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* iOS 刘海 + Home 指示条安全区域：用于底部固定区域 */
+.safe-area-pb {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 2rem);
+}
+
+/* 底部弹窗容器使用，避免被 Home 指示条遮挡 */
+.pb-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 2rem);
+}
+
+/* 顶部安全区域：用于全屏 fixed/inset-0 容器内的内容 */
+.pt-safe {
+  padding-top: calc(env(safe-area-inset-top) + 0.75rem);
+}
+
 /* 隐藏滚动条（用于首页等需要干净 UI 的滚动区域） */
 .no-scrollbar {
   scrollbar-width: none; /* Firefox */

@@ -44,7 +44,7 @@ export default function PreparePageClient() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#3c3c3c] flex flex-col px-4">
+    <div className="min-h-screen bg-white text-[#3c3c3c] flex flex-col px-4 pt-safe">
       {/* 顶部：左 X，中间进度条，右侧倒计时图标 + 文本 */}
       <header className="pt-4 pb-2 flex items-center">
         <button

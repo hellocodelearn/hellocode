@@ -46,3 +46,40 @@ export function PrimaryButton({
   );
 }
 
+/**
+ * 全局蓝色主按钮（如时间宝、退出确认等），抽离统一样式。
+ */
+export function BlueButton({
+  label,
+  onClick,
+  disabled,
+  className,
+}: PrimaryButtonProps) {
+  const base =
+    "w-full py-3.5 rounded-2xl font-extrabold text-base flex items-center justify-center gap-2 transition-all";
+  const enabledClasses =
+    "bg-[#1cb0f6] hover:bg-[#1990d8] text-white";
+  const disabledClasses =
+    "bg-slate-200 text-slate-400 cursor-not-allowed";
+
+  const finalClassName = [
+    base,
+    disabled ? disabledClasses : enabledClasses,
+    className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={finalClassName}
+    >
+      {label}
+    </button>
+  );
+}
+
+

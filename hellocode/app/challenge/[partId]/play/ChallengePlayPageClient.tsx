@@ -22,8 +22,14 @@ import {
   addTimePacks,
 } from "@/app/user-progress";
 import { IconX, IconGem } from "@/app/components/icons";
-import { PrimaryButton } from "@/app/components/PrimaryButton";
+import { PrimaryButton, BlueButton } from "@/app/components/PrimaryButton";
 import { AnswerFeedbackBar } from "@/app/components/AnswerFeedbackBar";
+import {
+  ChoiceOptions,
+  TrueFalseOptions,
+  SortQuestionBody,
+  OrderQuestionBody,
+} from "@/app/components/question-templates";
 
 const TIMER_COLOR = "#a4579d";
 
@@ -124,6 +130,7 @@ export default function ChallengePlayPageClient() {
   );
   const [showTimePackShop, setShowTimePackShop] = useState(false);
   const [selectedBundle, setSelectedBundle] = useState<"small" | "medium" | "large">("medium");
+  const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
 
   // 倒计时
   const [remainingSeconds, setRemainingSeconds] = useState(
@@ -137,20 +144,15 @@ export default function ChallengePlayPageClient() {
       setRemainingSeconds((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // 时间到：如果时间包足够（测试阶段用 < 99 判断），直接弹使用时间宝弹窗；
-          // 否则先弹购买时间宝弹窗。
-          if (timePacks >= 99) {
-            setShowTimeUpModal(true);
-          } else {
-            setShowTimePackShop(true);
-          }
+          // 时间到：始终先弹“使用时间宝”弹窗
+          setShowTimeUpModal(true);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [isTimerRunning, remainingSeconds, timePacks]);
+  }, [isTimerRunning, remainingSeconds]);
 
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
@@ -510,7 +512,10 @@ export default function ChallengePlayPageClient() {
         <button
           type="button"
           className="text-slate-400 hover:text-slate-600"
-          onClick={() => router.back()}
+          onClick={() => {
+            setIsTimerRunning(false);
+            setShowExitConfirmModal(true);
+          }}
         >
           <IconX className="w-5 h-5" />
         </button>
@@ -569,7 +574,7 @@ export default function ChallengePlayPageClient() {
         </div>
       </header>
 
-      {/* 中间：简单题目区域（先支持单选 / 判断题） */}
+      {/* 中间：题目区域（统一题型模版） */}
       <main className="flex-1 flex flex-col px-2 py-4">
         <div className="mb-3 text-xs text-slate-400">
           第 1 阶段 · {part.title} · 第 {currentIndex + 1}/
@@ -580,161 +585,39 @@ export default function ChallengePlayPageClient() {
         </h1>
 
         {currentQuestion.type === "choice" ? (
-          <div className="flex flex-col gap-3">
-            {currentQuestion.options.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                disabled={showFeedback !== null}
-                onClick={() => setSelectedChoiceId(opt.id)}
-                className={`w-full text-left px-4 py-3 rounded-2xl border-2 border-b-4 text-sm font-semibold transition-all ${
-                  selectedChoiceId === opt.id
-                    ? "bg-[#58cc02]/15 border-[#58cc02] border-b-[#46a302]"
-                    : "bg-white border-slate-200 hover:bg-slate-50"
-                } ${showFeedback ? "opacity-80" : ""}`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <ChoiceOptions
+            question={currentQuestion as any}
+            selectedId={selectedChoiceId}
+            disabled={showFeedback !== null}
+            onSelect={(id) => setSelectedChoiceId(id)}
+          />
         ) : currentQuestion.type === "true_false" ? (
-          <div className="flex gap-3 mt-2">
-            <button
-              type="button"
-              disabled={showFeedback !== null}
-              onClick={() => setSelectedTF(true)}
-              className={`flex-1 py-3 rounded-2xl border-2 border-b-4 font-extrabold text-sm transition-all ${
-                selectedTF === true
-                  ? "bg-[#58cc02]/15 border-[#58cc02] border-b-[#46a302]"
-                  : "bg-white border-slate-200 hover:bg-slate-50"
-              } ${showFeedback ? "opacity-80" : ""}`}
-            >
-              对
-            </button>
-            <button
-              type="button"
-              disabled={showFeedback !== null}
-              onClick={() => setSelectedTF(false)}
-              className={`flex-1 py-3 rounded-2xl border-2 border-b-4 font-extrabold text-sm transition-all ${
-                selectedTF === false
-                  ? "bg-[#58cc02]/15 border-[#58cc02] border-b-[#46a302]"
-                  : "bg-white border-slate-200 hover:bg-slate-50"
-              } ${showFeedback ? "opacity-80" : ""}`}
-            >
-              错
-            </button>
-          </div>
+          <TrueFalseOptions
+            question={currentQuestion as any}
+            selected={selectedTF}
+            disabled={showFeedback !== null}
+            onSelect={(v) => setSelectedTF(v)}
+          />
         ) : currentQuestion.type === "sort" ? (
-          (() => {
-            const sortQ = currentQuestion as SortQuestion;
-            return (
-              <>
-                <div className="mb-3 text-sm text-slate-500">
-                  点击下面的选项填入代码中的空格。
-                </div>
-                <div className="bg-slate-100 rounded-2xl p-4 mb-4">
-                  <div className="flex flex-wrap items-center gap-2 font-mono text-base">
-                    {sortQ.codeTemplate.map((piece, index) =>
-                      piece.type === "text" ? (
-                        <span
-                          key={`text-${index}`}
-                          className="text-slate-800"
-                        >
-                          {piece.value}
-                        </span>
-                      ) : (
-                        <button
-                          key={piece.id}
-                          type="button"
-                          onClick={() => handleSortBlankClick(piece.id)}
-                          className={`h-9 min-w-[80px] px-3 bg-white border-2 rounded-xl flex items-center justify-center ${
-                            sortFilled[piece.id]
-                              ? "border-[#58cc02] bg-[#58cc02]/5"
-                              : "border-dashed border-slate-400"
-                          }`}
-                        >
-                          <span
-                            className={
-                              sortFilled[piece.id]
-                                ? "text-slate-800 text-sm"
-                                : "text-slate-300 text-xs"
-                            }
-                          >
-                            {sortFilled[piece.id]
-                              ? sortQ.options.find(
-                                  (o) => o.id === sortFilled[piece.id]
-                                )?.label
-                              : "点击填入"}
-                          </span>
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-wrap justify-center gap-3">
-                  {sortQ.options.map((opt) => {
-                    const isUsed = !!sortUsedOptions[opt.id];
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        disabled={showFeedback !== null}
-                        onClick={() => handleSortOptionClick(opt.id)}
-                        className={`px-4 py-2 border-2 border-b-4 rounded-2xl font-mono text-sm ${
-                          isUsed
-                            ? "bg-slate-100 border-slate-200 text-slate-400"
-                            : "bg-white border-slate-200 hover:bg-slate-50 text-slate-800"
-                        } ${showFeedback ? "opacity-80" : ""}`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            );
-          })()
+          <SortQuestionBody
+            question={currentQuestion as SortQuestion}
+            blankIds={sortBlankIds}
+            filledByBlank={sortFilled}
+            usedOptions={sortUsedOptions}
+            disabled={showFeedback !== null}
+            onBlankClick={handleSortBlankClick}
+            onOptionClick={handleSortOptionClick}
+          />
         ) : currentQuestion.type === "order" ? (
-          (() => {
-            const orderQ = currentQuestion as OrderQuestion;
-            return (
-              <div className="flex flex-col gap-3">
-                {orderIds.map((id, index) => {
-                  const fragment = orderQ.fragments.find((f) => f.id === id);
-                  if (!fragment) return null;
-                  return (
-                    <div
-                      key={fragment.id}
-                      className={`flex items-center justify-between gap-2 p-3 rounded-2xl border-2 bg-white ${
-                        dragOrderIndex === index
-                          ? "border-[#58cc02]"
-                          : "border-slate-200"
-                      }`}
-                      draggable={!showFeedback}
-                      onDragStart={() => handleOrderDragStart(index)}
-                      onDragOver={handleOrderDragOver}
-                      onDrop={() => handleOrderDrop(index)}
-                    >
-                      <span className="text-sm font-mono text-slate-800 flex-1">
-                        {fragment.label}
-                      </span>
-                      {/* 右侧拖拽图标（汉堡菜单） */}
-                      <svg
-                        viewBox="0 0 1024 1024"
-                        className="w-5 h-5 flex-shrink-0"
-                        aria-hidden
-                      >
-                        <path
-                          d="M153.6 237.056a32.256 32.256 0 0 1 0-64h716.8a32.256 32.256 0 0 1 0 64z m0 307.2a32.256 32.256 0 0 1 0-64h716.8a32.256 32.256 0 0 1 0 64z m0 307.2a32.256 32.256 0 0 1 0-64h716.8a32.256 32.256 0 0 1 0 64z"
-                          fill="#5A5A68"
-                        />
-                      </svg>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()
+          <OrderQuestionBody
+            question={currentQuestion as OrderQuestion}
+            orderIds={orderIds}
+            activeIndex={dragOrderIndex}
+            disabled={showFeedback !== null}
+            onDragStart={handleOrderDragStart}
+            onDragOver={handleOrderDragOver}
+            onDrop={handleOrderDrop}
+          />
         ) : null}
       </main>
 
@@ -817,7 +700,7 @@ export default function ChallengePlayPageClient() {
         </div>
       )}
 
-      {/* 时间到后：已有时间包 → 使用时间包加时 1 分钟 */}
+      {/* 时间到后：先弹“使用时间宝”弹窗；点击按钮时再判断是否需要去购买页 */}
       {showTimeUpModal && !showTimePackShop && (
         <div className="fixed inset-0 z-50 flex items-end bg-black/45">
           <div className="w-full rounded-t-3xl bg-white px-4 pt-7 pb-10 shadow-2xl">
@@ -861,50 +744,56 @@ export default function ChallengePlayPageClient() {
               </div>
             </div>
 
-            <button
-              type="button"
-              disabled={timePacks <= 0}
+            <BlueButton
+              className="mb-3"
+              label={
+                <>
+                  <span>使用时间宝</span>
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="w-5 h-5"
+                    aria-hidden
+                  >
+                    <circle
+                      cx="45"
+                      cy="45"
+                      r="35"
+                      stroke="#A4579E"
+                      strokeWidth="10"
+                      fill="none"
+                    />
+                    <line
+                      x1="45"
+                      y1="45"
+                      x2="32"
+                      y2="32"
+                      stroke="#A4579E"
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                    />
+                    <path d="M72 58H88V74H72V58Z" fill="white" />
+                    <path
+                      d="M80 62V86M68 74H92"
+                      stroke="#A4579E"
+                      strokeWidth="12"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </>
+              }
               onClick={() => {
-                if (timePacks <= 0) return;
-                if (!spendTimePack()) return;
+                // 测试阶段：时间宝数量 < 0 直接打开购买弹窗
+                if (timePacks < 0 || !spendTimePack()) {
+                  setShowTimeUpModal(false);
+                  setShowTimePackShop(true);
+                  return;
+                }
                 setTimePacks((prev) => Math.max(0, prev - 1));
                 setRemainingSeconds((prev) => prev + 60);
                 setShowTimeUpModal(false);
                 setIsTimerRunning(true);
               }}
-              className={`w-full py-3.5 rounded-2xl font-extrabold text-base mb-3 flex items-center justify-center gap-2 ${
-                timePacks > 0
-                  ? "bg-[#1cb0f6] hover:bg-[#1990d8] text-white"
-                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
-              }`}
-            >
-              <svg
-                viewBox="0 0 100 100"
-                className="w-5 h-5"
-                aria-hidden
-              >
-                <path
-                  d="M45 10a35 35 0 1 0 0 70 35 35 0 0 0 0-70Z"
-                  stroke="#A4579E"
-                  strokeWidth="10"
-                  fill="none"
-                />
-                <path
-                  d="M45 45L32 32"
-                  stroke="#A4579E"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                />
-                <path d="M72 58H88V74H72V58Z" fill="white" />
-                <path
-                  d="M80 62V86M68 74H92"
-                  stroke="#A4579E"
-                  strokeWidth="12"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span>使用时间包</span>
-            </button>
+            />
 
             <button
               type="button"
@@ -1147,6 +1036,50 @@ export default function ChallengePlayPageClient() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* 局内退出确认弹窗（挑战专用）：按钮样式与其它页面统一 */}
+      {showExitConfirmModal && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/45"
+            aria-hidden
+          />
+          <div
+            className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-2xl pt-6 pb-9 px-6"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex justify-center mb-4">
+              <img
+                src="/robot-mascot.svg"
+                alt=""
+                className="w-24 h-24 object-contain"
+              />
+            </div>
+            <h2 className="text-center text-xl font-extrabold text-slate-800 mb-2 pb-5">
+              要是现在离开，前面的进度就白跑了！
+            </h2>
+            <BlueButton
+              className="mb-3"
+              label="返回"
+              onClick={() => {
+                setShowExitConfirmModal(false);
+                setIsTimerRunning(true);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setShowExitConfirmModal(false);
+                router.push("/");
+              }}
+              className="w-full text-center text-red-500 font-bold text-sm py-2"
+            >
+              退出
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
