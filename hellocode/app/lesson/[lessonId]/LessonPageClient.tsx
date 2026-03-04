@@ -560,6 +560,13 @@ export default function LessonPageClient() {
   );
   const isIOS = isIOSPlatform();
 
+  // 每局结束后的广告视频（在订阅弹窗之前播放）
+  const [showAdOverlay, setShowAdOverlay] = useState(false);
+  const [adDuration, setAdDuration] = useState<number | null>(null);
+  const [adRemainingSeconds, setAdRemainingSeconds] = useState(0);
+  const [adSkippable, setAdSkippable] = useState(false);
+  const adVideoRef = useRef<HTMLVideoElement | null>(null);
+
   const handleSuperSubscribe = async () => {
     if (isSuperUser || isSubscribing) {
       setShowSubscriptionOffer(false);
@@ -603,6 +610,24 @@ export default function LessonPageClient() {
       setIsRestoring(false);
     }
   };
+
+  useEffect(() => {
+    if (!showAdOverlay) return;
+
+    setAdSkippable(false);
+    setAdDuration(null);
+    setAdRemainingSeconds(0);
+
+    const videoEl = adVideoRef.current;
+    if (videoEl) {
+      try {
+        videoEl.currentTime = 0;
+        void videoEl.play();
+      } catch {
+        // ignore autoplay errors
+      }
+    }
+  }, [showAdOverlay]);
 
   useEffect(() => {
     if (!showDiamondClaim) return;
@@ -878,7 +903,7 @@ export default function LessonPageClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f7f8] dark:bg-[#101922] font-sans text-slate-900 dark:text-slate-100 antialiased overflow-x-hidden flex items-center justify-center">
+    <div className="min-h-screen bg-[#f5f7f8] dark:bg-[#101922] font-sans text-slate-900 dark:text-slate-100 antialiased overflow-x-hidden flex items-center justify-center pt-safe">
       <div className="mx-auto max-w-md w-full min-h-screen relative flex flex-col shadow-2xl bg-white dark:bg-[#1a2632] overflow-hidden">
         {/* 顶部进度条和能量值（结算页不展示） */}
         {!showResultScreen && (
@@ -1039,7 +1064,7 @@ export default function LessonPageClient() {
                         setShowTaskMissionPopup(true);
                       }
                     } else {
-                      setShowSubscriptionOffer(true);
+                      setShowAdOverlay(true);
                     }
                   }}
                   className="w-full font-extrabold text-lg uppercase tracking-wider py-3.5 rounded-2xl border-b-4 active:border-b-0 active:translate-y-1 shadow-lg transition-all bg-[#1cb0f6] hover:bg-[#1990d8] text-white border-[#1990d8]"
@@ -1572,6 +1597,89 @@ export default function LessonPageClient() {
               </div>
             </div>
           </>
+        )}
+
+        {/* 每局结束后：在订阅弹窗之前播放的全屏广告视频 */}
+        {showAdOverlay && !isSuperUser && (
+          <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
+            <video
+              ref={adVideoRef}
+              src="/ADS/ad1.mp4"
+              className="w-full h-full object-contain bg-black"
+              autoPlay
+              playsInline
+              onLoadedMetadata={(e) => {
+                const d = e.currentTarget.duration;
+                if (!Number.isNaN(d) && d > 0) {
+                  const seconds = Math.ceil(d);
+                  setAdDuration(seconds);
+                  setAdRemainingSeconds(seconds);
+                }
+              }}
+              onTimeUpdate={(e) => {
+                const v = e.currentTarget;
+                if (Number.isNaN(v.duration) || v.duration <= 0) return;
+                const remaining = Math.max(
+                  0,
+                  Math.ceil(v.duration - v.currentTime)
+                );
+                setAdRemainingSeconds(remaining);
+                if (remaining <= 0 && !adSkippable) {
+                  setAdSkippable(true);
+                }
+              }}
+              onEnded={(e) => {
+                const v = e.currentTarget;
+                try {
+                  v.pause();
+                } catch {
+                  // ignore
+                }
+                setAdRemainingSeconds(0);
+                setAdSkippable(true);
+              }}
+            />
+            <button
+              type="button"
+              disabled={!adSkippable}
+              onClick={() => {
+                if (!adSkippable) return;
+                const v = adVideoRef.current;
+                if (v) {
+                  try {
+                    v.pause();
+                  } catch {
+                    // ignore
+                  }
+                }
+                setShowAdOverlay(false);
+                setShowSubscriptionOffer(true);
+              }}
+              className={`absolute left-4 top-3 pt-safe rounded-full flex items-center justify-center w-12 h-12 border-2 ${
+                adSkippable
+                  ? "border-white bg-black/60"
+                  : "border-white/40 bg-black/60"
+              }`}
+            >
+              {adSkippable ? (
+                <svg
+                  viewBox="0 0 1024 1024"
+                  className="w-4 h-4"
+                  aria-hidden
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M266.208 265.376a31.968 31.968 0 0 1 45.184 0L496 449.92l184.608-184.576a31.968 31.968 0 0 1 45.184 0l0.832 0.832a31.968 31.968 0 0 1 0 45.184L542.08 496l184.576 184.608a32 32 0 0 1 2.688 42.176l-2.688 3.008-0.832 0.832a31.968 31.968 0 0 1-45.184 0L496 542.08l-184.608 184.576a31.968 31.968 0 0 1-45.184 0l-0.832-0.832a31.968 31.968 0 0 1 0-45.184L449.92 496 265.376 311.392a32 32 0 0 1-2.688-42.176l2.688-3.008z"
+                    fill="#C2C7CC"
+                  />
+                </svg>
+              ) : (
+                <span className="text-xs font-bold text-white">
+                  {adRemainingSeconds}
+                </span>
+              )}
+            </button>
+          </div>
         )}
 
         {/* 通关后先弹出的 7 天 Super 试用页，同款深色渐变 + 机器人，关闭后再展示任务弹窗 */}

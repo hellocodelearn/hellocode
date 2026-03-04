@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { getStage1LessonById, parts, Part } from "@/app/course-data";
@@ -14,7 +13,6 @@ import {
   IconZap,
   IconFileText,
   IconCheckCircle,
-  IconHome,
 } from "@/app/components/icons";
 import {
   TreasureChestReadyIcon,
@@ -88,6 +86,22 @@ function LanguageIcon({ lang }: { lang: "c" | "java" | "python" }) {
   );
 }
 
+function LessonListIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 1024 1024"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+      {...props}
+    >
+      <path
+        d="M851.2 0H288C211.2 0 153.6 57.6 153.6 134.4v19.2C89.6 166.4 44.8 224 44.8 294.4c0 44.8 19.2 83.2 51.2 108.8C64 428.8 44.8 467.2 44.8 512S64 595.2 96 620.8C64 646.4 44.8 684.8 44.8 729.6c0 70.4 44.8 121.6 108.8 140.8v19.2C153.6 960 211.2 1024 288 1024h563.2c70.4 0 134.4-57.6 134.4-134.4V134.4C979.2 57.6 921.6 0 851.2 0zM153.6 800c-25.6-12.8-44.8-38.4-44.8-70.4 0-32 19.2-57.6 44.8-70.4V800zm0-217.6C128 569.6 108.8 544 108.8 512c0-32 19.2-57.6 44.8-70.4v140.8zm0-224c-25.6-6.4-44.8-38.4-44.8-64 0-32 19.2-57.6 44.8-70.4v134.4zM812.8 793.6H352v-64h460.8v64zm0-230.4H352v-64h460.8v64zm0-268.8H352v-64h460.8v64z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 function computeLessonState(
   progress: UserProgress,
   lessonId: string
@@ -136,21 +150,23 @@ function CheckpointNode({
   const discLight = isUnlocked ? baseColor : grayBg;
   const discDark = isUnlocked ? "#46a302" : grayBorder;
 
-  // 5 段圆弧：仅当前在学关卡渲染，带扩散收缩动效
-  const arcRadius = 38;
+  // 入口与圆弧统一尺寸；圆盘略扁椭圆，整体更圆一些
+  const nodeSize = 110;
+  const discWidth = 76;
+  const discHeight = 72;
+  const center = nodeSize / 2; // 55
+  const arcRadius = 42; // 圆弧包在椭圆外一圈
   const arcStrokeWidth = 6;
   const segDeg = 43;
-  const cx = 48;
-  const cy = 48;
 
-  // 圆弧路径：坐标取整到 2 位小数，避免服务端/客户端浮点差异导致 hydration 报错
+  // 圆弧路径：与入口同 viewBox、同中心，取整避免 hydration 差异
   const arcPaths = Array.from({ length: segments }).map((_, i) => {
     const startAngle = ((-90 + i * 72) * Math.PI) / 180;
     const endAngle = ((-90 + i * 72 + segDeg) * Math.PI) / 180;
-    const x1 = Number((cx + arcRadius * Math.cos(startAngle)).toFixed(2));
-    const y1 = Number((cy + arcRadius * Math.sin(startAngle)).toFixed(2));
-    const x2 = Number((cx + arcRadius * Math.cos(endAngle)).toFixed(2));
-    const y2 = Number((cy + arcRadius * Math.sin(endAngle)).toFixed(2));
+    const x1 = Number((center + arcRadius * Math.cos(startAngle)).toFixed(2));
+    const y1 = Number((center + arcRadius * Math.sin(startAngle)).toFixed(2));
+    const x2 = Number((center + arcRadius * Math.cos(endAngle)).toFixed(2));
+    const y2 = Number((center + arcRadius * Math.sin(endAngle)).toFixed(2));
     const fill = i < filledSegments ? baseColor : grayBg;
     return { d: `M ${x1} ${y1} A ${arcRadius} ${arcRadius} 0 0 1 ${x2} ${y2}`, fill };
   });
@@ -163,7 +179,7 @@ function CheckpointNode({
       className={`relative inline-flex items-center justify-center ${
         !isUnlocked ? "cursor-default opacity-60" : "cursor-pointer"
       }`}
-      style={{ width: 96, height: 96 }}
+      style={{ width: nodeSize, height: nodeSize }}
       onClick={(e) => {
         if (!isUnlocked) return;
         if (
@@ -176,18 +192,18 @@ function CheckpointNode({
         onSelectLesson?.(lessonId, e);
       }}
     >
-      <div className="relative flex items-center justify-center" style={{ width: 96, height: 96 }}>
-        {/* 5 段圆弧：仅当前在学关卡显示，带扩散收缩动效 */}
+      <div className="relative flex items-center justify-center" style={{ width: nodeSize, height: nodeSize }}>
+        {/* 5 段圆弧：与入口同尺寸同中心，仅当前在学关卡显示，带扩散收缩动效 */}
         {isCurrentLesson && (
           <div
             className="absolute inset-0 flex items-center justify-center animate-arc-pulse"
-            style={{ width: 96, height: 96 }}
+            style={{ width: nodeSize, height: nodeSize }}
             aria-hidden
           >
             <svg
-              viewBox="0 0 96 96"
-              className="absolute"
-              style={{ width: 96, height: 96 }}
+              viewBox={`0 0 ${nodeSize} ${nodeSize}`}
+              className="absolute inset-0 w-full h-full"
+              preserveAspectRatio="xMidYMid meet"
               suppressHydrationWarning
             >
               {arcPaths.map(({ d, fill }, i) => (
@@ -203,27 +219,54 @@ function CheckpointNode({
             </svg>
           </div>
         )}
-        {/* 中间实心圆盘 */}
+        {/* 中间实心椭圆盘：更圆 + 阴影面积更小 + 两条宽高光从右上到左下穿过 */}
         <div
-          className="relative rounded-full flex items-center justify-center"
+          className="relative rounded-full flex items-center justify-center overflow-hidden"
           style={{
-            width: 60,
-            height: 60,
-            background: `linear-gradient(145deg, ${discLight} 0%, ${discLight} 40%, ${discDark} 100%)`,
-            borderBottom: `6px solid ${discDark}`,
-            boxShadow: isUnlocked
-              ? "0 6px 0 rgba(15,23,42,0.18)"
-              : "0 4px 0 rgba(148,163,184,0.6)",
+            width: discWidth,
+            height: discHeight,
+            background: isUnlocked ? discLight : grayBg,
+            borderBottom: isUnlocked ? `3px solid ${discDark}` : `3px solid ${grayBorder}`,
+            boxShadow: isUnlocked ? `0 3px 0 ${discDark}` : "0 3px 0 rgba(148,163,184,0.6)",
           }}
         >
-          <div
-            className="absolute -top-1 left-4 w-8 h-3 rounded-full bg-white/35"
-            style={{ transform: "rotate(-20deg)" }}
-          />
+          {/* 两条很宽的高光：比按钮绿淡一些（非白），从右上角到左下角穿过 */}
+          {isUnlocked && (
+            <>
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  top: "50%",
+                  left: "50%",
+                  width: "145%",
+                  height: 12,
+                  marginLeft: "-72.5%",
+                  marginTop: -6,
+                  background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.22) 20%, rgba(255,255,255,0.32) 50%, rgba(255,255,255,0.2) 80%, transparent 100%)",
+                  transform: "rotate(-45deg)",
+                  transformOrigin: "center center",
+                }}
+              />
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  top: "50%",
+                  left: "50%",
+                  width: "145%",
+                  height: 12,
+                  marginLeft: "-72.5%",
+                  marginTop: -6,
+                  background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 25%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.14) 75%, transparent 100%)",
+                  transform: "translateY(-38px) rotate(-45deg)",
+                  transformOrigin: "center center",
+                }}
+              />
+            </>
+          )}
           {isTrophy ? (
-            <IconTrophy className="w-[30px] h-[30px]" style={{ color: iconColor }} />
+            <IconTrophy className="w-[34px] h-[34px]" style={{ color: iconColor }} />
           ) : (
-            <IconStar className="w-[30px] h-[30px]" style={{ color: iconColor }} />
+            <IconStar className="w-[34px] h-[34px]" style={{ color: iconColor }} />
           )}
         </div>
       </div>
@@ -380,84 +423,83 @@ export default function Page() {
   const preferredLang = getPreferredLanguage(progress);
 
   return (
-    <div className="h-screen bg-[#f5f7fb] text-[#3c3c3c] dark:bg-[#131f24] dark:text-slate-100 flex flex-col overflow-hidden pt-safe">
+    <div className="h-screen bg-[#f5f7fb] text-[#3c3c3c] dark:bg-[#131f24] dark:text-slate-100 flex flex-col overflow-hidden">
       {/* 顶部状态栏（固定） */}
-      <header className="fixed top-0 left-0 right-0 z-20 bg-[#f5f7fb] dark:bg-[#131f24] pt-safe">
-        <div className="mx-auto max-w-md px-4 pt-3 pb-2 flex text-[13px] font-semibold">
-          {/* 语言等级 */}
-          <div className="w-1/4 flex items-center gap-1">
-            <div className="flex items-center gap-1">
-              <span className="inline-flex items-center justify-center rounded-md bg-white/70 px-1 shadow-sm">
+      <header className="fixed left-0 right-0 z-20 bg-white dark:bg-[#111827] pt-safe">
+        <div className="mx-auto max-w-md px-3 pb-2">
+          {/* 顶部统计条：白色半透明底，无圆形胶囊边框 */}
+          <div className="h-9 bg-white/80 dark:bg-[#111827]/90 flex items-center px-3 gap-4 text-[13px] font-semibold">
+            {/* 语言等级 */}
+            <div className="flex-1 flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center rounded-md bg-[#e5f5ff] px-1.5 py-0.5 shadow-sm">
                 <LanguageIcon lang={preferredLang} />
               </span>
-              <span className="text-[13px] font-semibold">
-                {preferredLang === "c"
-                  ? "C 语言"
-                  : preferredLang === "java"
-                  ? "Java"
-                  : "Python"}
+              <span className="ml-0.5 text-[16px] font-extrabold leading-none">1</span>
+            </div>
+
+            {/* 连胜火焰 */}
+            <div
+              className={`flex-1 flex items-center justify-center gap-1.5 ${
+                hasPlayedToday(progress) ? "text-[#FF9800]" : "text-gray-400"
+              }`}
+            >
+              <IconFlame className="w-[18px] h-[18px]" />
+              <span className="text-[16px] font-extrabold leading-none">
+                {getStreakDays(progress)}
               </span>
             </div>
-            <span className="font-extrabold text-xl leading-none ml-1">1</span>
-          </div>
 
-          {/* 连胜火焰 */}
-          <div
-            className={`w-1/4 flex items-center gap-1 ${
-              hasPlayedToday(progress) ? "text-[#FF9800]" : "text-gray-400"
-            }`}
-          >
-            <IconFlame className="w-[18px] h-[18px] leading-none" />
-            <span className="font-extrabold text-xl leading-none">
-              {getStreakDays(progress)}
-            </span>
-          </div>
+            {/* 钻石 */}
+            <div className="flex-1 flex items-center justify-center gap-1.5 text-[#1cb0f6]">
+              <IconGem className="w-[18px] h-[18px]" />
+              <span className="text-[16px] font-extrabold leading-none">
+                {getDiamonds(progress)}
+              </span>
+            </div>
 
-          {/* 钻石 */}
-          <div className="w-1/4 flex items-center gap-1 text-[#1cb0f6]">
-            <IconGem className="w-[18px] h-[18px] leading-none text-[#1cb0f6]" />
-            <span className="font-extrabold text-xl leading-none">
-              {getDiamonds(progress)}
-            </span>
-          </div>
-
-          {/* 能量 */}
-          <div className="w-1/4 flex items-center gap-1 text-[#ff78ca]">
-            <IconBattery className="w-[18px] h-[18px] leading-none text-[#1cb0f6]" />
-            <span className="font-extrabold text-xl leading-none">
-              {isSuperSubscribed(progress) ? "MAX" : getEnergy(progress)}
-            </span>
+            {/* 能量 */}
+            <div className="flex-1 flex items-center justify-end gap-1.5 text-[#ff78ca]">
+              <IconBattery className="w-[17px] h-[17px] text-[#ff78ca]" />
+              <span className="text-[16px] font-extrabold leading-none">
+                {isSuperSubscribed(progress) ? "MAX" : getEnergy(progress)}
+              </span>
+            </div>
           </div>
         </div>
       </header>
 
       {/* 中间可滚动区域（隐藏原生滚动条） */}
       <main className="flex-1 overflow-y-auto no-scrollbar">
-        <div className="mx-auto max-w-md px-4 pt-[80px] pb-[96px]">
+        <div className="mx-auto max-w-md px-4 pt-[80px] pb-[96px] bg-white">
           {parts.map((part, partIndex) => (
             <section key={part.id} className="mb-8">
               {/* 部分卡片：第 1 阶段 · 第 X 部分，下方为标题 */}
               <div
-                className="text-white rounded-3xl px-4 py-3 mb-4 flex items-center justify-between shadow-md"
-                style={{ backgroundColor: part.color }}
+                className="relative text-white rounded-3xl px-5 py-4 mb-4 flex items-center justify-between"
+                style={{
+                  backgroundColor: part.color,
+                  boxShadow: "0 4px 0 #46a302",
+                }}
               >
                 <div className="leading-snug min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold text-white/90">
+                  <div className="text-[14px] font-extrabold text-white/95">
                     第 1 阶段 · 第 {partIndex + 1} 部分
                   </div>
-                  <div className="mt-1 text-[15px] font-extrabold text-white">
+                  <div className="mt-1 text-[18px] font-extrabold text-white leading-snug">
                     {part.title}
                   </div>
                 </div>
-                <button className="ml-4 w-10 h-10 flex-shrink-0 rounded-2xl bg-black/15 flex items-center justify-center shadow-inner">
-                  <IconFileText className="w-[22px] h-[22px] text-white" />
-                </button>
+                <div className="ml-4 h-full flex items-center pl-4 border-l-2 border-[#46a302]">
+                  <button className="w-9 h-9 flex-shrink-0 rounded-2xl bg-black/10 flex items-center justify-center shadow-inner">
+                    <LessonListIcon className="w-5 h-5 text-white" />
+                  </button>
+                </div>
               </div>
 
               {/* 路线节点：前半关卡 + 中间宝箱 + 后半关卡 */}
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {getPartPathNodes(part).map((node, idx) => {
-                  const rowOffsetClass = idx % 2 === 0 ? "-translate-x-10" : "translate-x-10";
+                  const rowOffsetClass = idx % 2 === 0 ? "-translate-x-6" : "translate-x-6";
                   const isLeftRow = idx % 2 === 0;
                   if (node.type === "lesson") {
                     return (
@@ -761,7 +803,7 @@ export default function Page() {
       )}
 
       {/* 底部 Tab 栏：仅主页 + 订阅页，选中项浅蓝底+蓝框 */}
-      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-gray-200 bg-white dark:bg-[#111827]">
+      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-gray-200 bg-white dark:bg-[#111827] safe-area-pb">
         <div className="mx-auto max-w-md flex items-center justify-around py-2">
           <Link
             href="/"
@@ -771,8 +813,15 @@ export default function Page() {
                 : "hover:text-gray-800 dark:hover:text-gray-200"
             }`}
           >
-            <IconHome className="w-[26px] h-[26px]" />
-            <span className="text-xs font-medium">主页</span>
+            <svg className="w-[32px] h-[32px]" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+              <path d="M206.7 705.9v145.6c0 49.8 40.4 90.2 90.2 90.2h375.3V612.4c0-31.1 25.4-56.5 56.5-56.5s56.5 25.4 56.5 56.5v329.3h35.1c49.8 0 90.2-40.4 90.2-90.2V552.1c47.1 0 69.4-58 34.5-89.6L615.5 164.2c-32.3-29.2-81.5-29.2-113.8 0L172.2 462.5c-34.9 31.6-12.5 89.6 34.5 89.6v58.2" fill="#FF7801" />
+              <path d="M750.9 957.4h-55.1V608.1c0-20.1-16.4-36.5-36.5-36.5s-36.5 16.4-36.5 36.5v349.3H227.6c-60.8 0-110.2-49.4-110.2-110.2V701.6c0-11 9-20 20-20s20 9 20 20v145.6c0 38.7 31.5 70.2 70.2 70.2h355.3V608.1c0-42.2 34.3-76.5 76.5-76.5s76.5 34.3 76.5 76.5v309.3H751c38.7 0 70.2-31.5 70.2-70.2V527.9h20c20 0 27.5-15.4 29.3-20.1 1.8-4.7 6.6-21.2-8.2-34.6L532.7 174.8a64.717 64.717 0 0 0-87 0L116.3 473.1c-14.8 13.4-10.1 29.9-8.2 34.6 1.8 4.7 9.3 20.1 29.3 20.1h20V606c0 11-9 20-20 20s-20-9-20-20v-41c-21.1-6-38.4-21.6-46.7-42.9-10.7-27.8-3.4-58.7 18.7-78.7l329.5-298.3c19.3-17.5 44.3-27.1 70.3-27.1s51 9.6 70.3 27.1L889 443.4c22.1 20 29.4 50.9 18.7 78.7-8.2 21.3-25.6 36.9-46.7 42.9v282.2c0.1 60.8-49.3 110.2-110.1 110.2z" fill="currentColor" />
+              <path d="M284 703.9c-11 0-20-9-20-20V569.7c0-11 9-20 20-20s20 9 20 20v114.2c0 11-8.9 20-20 20z" fill="#FBFFFD" />
+              <path d="M261.2 731.8a22.8 21.1 0 1 0 45.6 0 22.8 21.1 0 1 0-45.6 0Z" fill="#FBFFFD" />
+              <path d="M171.4 198.2m-27.2 0a27.2 27.2 0 1 0 54.4 0 27.2 27.2 0 1 0-54.4 0Z" fill="#FF7801" />
+              <path d="M230.2 151m-17.7 0a111 0-20-9-20-20s9-20 20-20h103.7c11 0 20 9 20 20s-9 20-20.1 20z" fill="#FF7801" />
+              <path d="M887.1 264.8c-11 0-20-9-20-20V138c0-11 9-20 20-20s20 9 20 20v106.8c0 11.1-9 20-20 20z" fill="#FF7801" />
+            </svg>
           </Link>
 
           <Link
@@ -783,15 +832,15 @@ export default function Page() {
                 : "hover:text-gray-800 dark:hover:text-gray-200"
             }`}
           >
-            <Image
-              src="/robot-mascot.svg"
-              alt="订阅"
-              width={28}
-              height={28}
-              className="object-contain"
-              style={{ transform: "scaleX(-1) rotate(-8deg)" }}
-            />
-            <span className="text-xs font-medium">订阅</span>
+            <svg className="w-[32px] h-[32px]" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+              <path d="M232.1 863.5H806l85.9-458.7-225 153L519 175.5 374 557.2 147.8 404.8z" fill="#FFC500" />
+              <path d="M519.4 287.2l110.2 285 18.2 47 41.6-28.3 145.5-99-62.1 331.6H265.4l-61.1-332.4 147.2 99.2 41.8 28.2 17.9-47.1 108.2-284.2m-0.4-111.7L374 557.2 147.8 404.8l84.3 458.7H806l85.9-458.7-225 153.1L519 175.5z" fill="#D8A001" />
+              <path d="M519.9 115.1m-53.2 0a53.2 53.2 0 1 0 106.4 0 53.2 53.2 0 1 0-106.4 0Z" fill="#D8A001" />
+              <path d="M904.4 369.1m-35.6 0a35.6 35.6 0 1 0 71.2 0 35.6 35.6 0 1 0-71.2 0Z" fill="#D8A001" />
+              <path d="M136.9 369.1m-35.6 0a35.6 35.6 0 1 0 71.2 0 35.6 35.6 0 1 0-71.2 0Z" fill="#D8A001" />
+              <path d="M288.1 925.6H747" fill="#FFC500" />
+              <path d="M747 945.6H288.1c-11 0-20-9-20-20s9-20 20-20H747c11 0 20 9 20 20s-9 20-20 20z" fill="#D8A001" />
+            </svg>
           </Link>
         </div>
       </nav>

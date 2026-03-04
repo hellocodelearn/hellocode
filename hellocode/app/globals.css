@@ -23,23 +23,25 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
-  padding-top: env(safe-area-inset-top);
+  /* 不在 body 上额外加顶部 padding，交给各个页面自己处理 */
+  padding-top: 0;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* iOS 刘海 + Home 指示条安全区域：用于底部固定区域 */
 .safe-area-pb {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 2rem);
+  /* 仅预留系统 Home 指示条的安全区高度 */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* 底部弹窗容器使用，避免被 Home 指示条遮挡 */
 .pb-safe {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 2rem);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* 顶部安全区域：用于全屏 fixed/inset-0 容器内的内容 */
+/* 顶部安全区域：用于需要避开刘海的容器（例如 fixed header、全屏弹层） */
 .pt-safe {
-  padding-top: calc(env(safe-area-inset-top) + 0.75rem);
+  padding-top: env(safe-area-inset-top);
 }
 
 /* 隐藏滚动条（用于首页等需要干净 UI 的滚动区域） */

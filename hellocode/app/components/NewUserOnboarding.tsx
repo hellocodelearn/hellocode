@@ -16,7 +16,7 @@ export function NewUserOnboarding({ onDone }: NewUserOnboardingProps) {
 
   return (
     <div className="fixed inset-0 z-[80] flex justify-center items-center bg-[#f5f7fb] pt-safe">
-      <div className="w-full max-w-sm h-full flex flex-col mx-auto px-4 pt-4 pb-6">
+      <div className="w-full max-w-sm h-full flex flex-col mx-auto px-4 pt-6 pb-6">
 
         {step === 1 && (
           <>

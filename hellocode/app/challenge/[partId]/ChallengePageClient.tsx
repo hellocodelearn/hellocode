@@ -43,7 +43,7 @@ export default function ChallengePageClient() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f7fb] text-[#3c3c3c] flex flex-col px-4 pt-safe">
+    <div className="min-h-screen bg-[#f5f7fb] text-[#3c3c3c] flex flex-col px-4">
       {/* 顶部 Header：左 X，中间标题，右侧粉色体力胶囊 */}
       <header className="pt-4 pb-2 flex items-center justify-between">
         <button
